@@ -1561,7 +1561,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             Vector3 v = new Vector3(3f, 4f, 0f);
             Vector3 expected = v.normalized;
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1572,7 +1572,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             Vector3 v = new Vector3(0f, 0f, 0f);
             Vector3 expected = v.normalized;
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1583,7 +1583,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             Vector3 v = new Vector3(-5f, 0f, 0f);
             Vector3 expected = v.normalized;
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1594,7 +1594,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             Vector3 v = new Vector3(1.2f, 3.4f, 5.6f);
             Vector3 expected = v.normalized;
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1605,7 +1605,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             Vector3 v = new Vector3(100f, 0f, 0f);
             Vector3 expected = v.normalized;
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1616,7 +1616,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             Vector3 v = new Vector3(0f, -10f, 0f);
             Vector3 expected = v.normalized;
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1627,7 +1627,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             float3 v = new float3(3f, 4f, 0f);
             float3 expected = math.normalize(v);
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1638,7 +1638,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             float3 v = new float3(0f, 0f, 0f);
             float3 expected = math.normalize(v);
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1649,7 +1649,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             float3 v = new float3(-5f, 0f, 0f);
             float3 expected = math.normalize(v);
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1660,7 +1660,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             float3 v = new float3(1.2f, 3.4f, 5.6f);
             float3 expected = math.normalize(v);
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1671,7 +1671,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             float3 v = new float3(100f, 0f, 0f);
             float3 expected = math.normalize(v);
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
@@ -1682,7 +1682,7 @@ namespace Vector3ToFloat3UtilUnitTests
         {
             float3 v = new float3(0f, -10f, 0f);
             float3 expected = math.normalize(v);
-            Vector3ToFloat3Utils.Normalize(ref v);
+            Vector3ToFloat3Utils.Normalize(v);
             Assert.AreEqual(expected.x, v.x);
             Assert.AreEqual(expected.y, v.y);
             Assert.AreEqual(expected.z, v.z);
