@@ -172,12 +172,12 @@ namespace MigrateToUnityMathematics
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Normalize(ref Vector3 v)
+        public static void Normalize(Vector3 v)
         {
             v.Normalize();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Normalize(ref float3 v)
+        public static void Normalize(float3 v)
         {
             v = math.normalize(v);
         }
