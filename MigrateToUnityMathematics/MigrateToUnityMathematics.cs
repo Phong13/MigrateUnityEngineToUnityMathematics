@@ -1,15 +1,15 @@
 ﻿// Program.cs
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.MSBuild;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
-
 using Microsoft.Build.Locator;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.MSBuild;
 
 namespace UnityVector3Refactor
 {
@@ -28,7 +28,25 @@ namespace UnityVector3Refactor
                 return;
             }
 
+            /*
             MSBuildLocator.RegisterDefaults(); // Registers installed MSBuild instance
+
+            ^This was not working for me, replaced with RegisterMSBuildPath() and used:
+            dotnet run --project MigrateToUnityMathematics.csproj -- "C:\Users\rowan\Workspace\Unity\Vector3ToFloat3MigrationTestingUnity\Assembly-CSharp.csproj"
+            */
+
+            const string msBuildPath = @"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin";
+            try
+            {
+                MSBuildLocator.RegisterMSBuildPath(msBuildPath);
+                Console.WriteLine($"Successfully registered MSBuild from custom path: {msBuildPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error registering MSBuild path: {ex.Message}");
+                Console.WriteLine("Please ensure the path is correct and that Visual Studio is installed with the MSBuild workload.");
+                return;
+            }
 
             string targetPath = args[0];
             string fullPath = Path.GetFullPath(targetPath);
@@ -98,6 +116,7 @@ namespace UnityVector3Refactor
             Console.WriteLine($"Solution loaded. Contains {solution.Projects.Count()} project(s).");
 
             int totalReplacements = 0;
+
             foreach (var project in solution.Projects)
             {
                 Console.WriteLine($"\nProcessing project: {project.Name}");
@@ -109,21 +128,23 @@ namespace UnityVector3Refactor
 
                 foreach (var document in project.Documents)
                 {
-                    if (document.SourceCodeKind == SourceCodeKind.Regular && document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                    if (document.SourceCodeKind == SourceCodeKind.Regular &&
+                        document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
+                        !document.Name.Contains("Vector3ToFloat3Utils")) // Make sure not to change the file with the wrappers
                     {
                         Console.WriteLine($"  Processing document: {Path.GetFileName(document.FilePath)}");
+
                         var originalSyntaxTree = await document.GetSyntaxTreeAsync();
                         var originalSemanticModel = await document.GetSemanticModelAsync();
 
-                        var rewriter = new MagnitudeRewriter(originalSemanticModel);
-                        var newSyntaxRoot = rewriter.Visit(originalSyntaxTree.GetRoot());
+                        var vector3ToFloat3Rewriter = new Vector3ToFloat3Rewriter(originalSemanticModel);
+                        var newSyntaxRoot = vector3ToFloat3Rewriter.Visit(originalSyntaxTree.GetRoot());
 
                         if (newSyntaxRoot != originalSyntaxTree.GetRoot())
                         {
-                            // Document has been changed, update it in the solution
+                            totalReplacements += vector3ToFloat3Rewriter.ReplacementsCount;
                             solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
-                            Console.WriteLine($"    Replaced {rewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
-                            totalReplacements += rewriter.ReplacementsCount;
+                            Console.WriteLine($"    Replaced " + $"{totalReplacements} instances in {Path.GetFileName(document.FilePath)}");
                         }
                     }
                 }
@@ -143,71 +164,263 @@ namespace UnityVector3Refactor
     }
 
     /// <summary>
-    /// This SyntaxRewriter visits the syntax tree and replaces 'Vector3.magnitude' property access
-    /// with 'Vector3Utils.length(vector)'.
+    /// Rewrites Vector3 properties, methods, and operators
     /// </summary>
-    class MagnitudeRewriter : CSharpSyntaxRewriter
+    class Vector3ToFloat3Rewriter : CSharpSyntaxRewriter
     {
         private readonly SemanticModel _semanticModel;
         public int ReplacementsCount { get; private set; } = 0;
 
-        public MagnitudeRewriter(SemanticModel semanticModel)
+        public Vector3ToFloat3Rewriter(SemanticModel semanticModel)
         {
             _semanticModel = semanticModel;
         }
 
-        // Override VisitMemberAccessExpression to find property accesses
+        /// <summary>
+        /// Override VisitMemberAccessExpression for property access
+        /// </summary>
         public override SyntaxNode VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
         {
-            // First, let the base rewriter visit the children to ensure inner expressions are processed
+            // Get the original symbol early so we have it even if the syntax tree changes (e.g. Vector3.Angle(Vector3.up, ...))
+            var originalSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
+
             var newNode = (MemberAccessExpressionSyntax)base.VisitMemberAccessExpression(node);
 
-            // Check if the member being accessed is "magnitude"
-            if (newNode.Name.Identifier.Text == "magnitude")
-            {
-                // Get the symbol for the member access
-                var symbol = _semanticModel.GetSymbolInfo(newNode).Symbol;
+            string memberName = newNode.Name.Identifier.Text;
 
-                // Check if it's a property and if its containing type is Unity's Vector3
-                if (symbol is IPropertySymbol propertySymbol &&
-                    propertySymbol.ContainingType.Name == "Vector3" &&
-                    propertySymbol.ContainingType.ContainingNamespace?.ToDisplayString() == "UnityEngine")
+            if (memberName == "magnitude" || memberName == "sqrMagnitude" || memberName == "normalized")
+            {
+                if (originalSymbol is IPropertySymbol propSymbol &&
+                    propSymbol.ContainingType != null &&
+                    propSymbol.ContainingType.ToDisplayString() == "UnityEngine.Vector3" &&
+                    propSymbol.ContainingType.ContainingNamespace?.ToDisplayString() == "UnityEngine")
                 {
-                    // This is a Vector3.magnitude access!
                     ReplacementsCount++;
 
-                    // Get the expression that the magnitude is being called on (e.g., 'myVector' in 'myVector.magnitude')
                     var expression = newNode.Expression;
 
-                    // Create the new method call: Vector3Utils.length(expression)
-                    // First, the argument list for the new method call
                     var argumentList = SyntaxFactory.ArgumentList(
                         SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.Argument(expression.WithoutTrivia()) // Remove trivia from the expression for clean insertion
+                        SyntaxFactory.Argument(expression.WithoutTrivia())
                         )
                     );
 
-                    // Create the member access for Vector3Utils.length
                     var memberAccess = SyntaxFactory.MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
-                        SyntaxFactory.IdentifierName("Vector3Utils"), // The class name
-                        SyntaxFactory.IdentifierName("length")       // The static method name
+                        SyntaxFactory.IdentifierName("Vector3ToFloat3Utils"),
+                        SyntaxFactory.IdentifierName(memberName)
                     );
 
-                    // Create the invocation expression
                     var invocationExpression = SyntaxFactory.InvocationExpression(
                         memberAccess,
                         argumentList
                     );
 
-                    // Preserve leading trivia from the original member access expression
-                    // and trailing trivia from the original node.
                     return invocationExpression
                         .WithLeadingTrivia(newNode.GetLeadingTrivia())
                         .WithTrailingTrivia(newNode.GetTrailingTrivia());
                 }
             }
-            return newNode; // Return the (potentially modified) node
+
+            if (memberName == "forward" || memberName == "back" || memberName == "up" || memberName == "down" ||
+                memberName == "right" || memberName == "left" || memberName == "one" || memberName == "zero")
+            {
+                if (originalSymbol is IPropertySymbol propSymbol &&
+                    propSymbol.ContainingType != null &&
+                    propSymbol.ContainingType.ToDisplayString() == "UnityEngine.Vector3" &&
+                    propSymbol.ContainingType.ContainingNamespace?.ToDisplayString() == "UnityEngine")
+                {
+                    ReplacementsCount++;
+
+                    var replacement = SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName("Vector3ToFloat3Utils"),
+                        SyntaxFactory.IdentifierName(memberName)
+                    );
+
+                    return replacement
+                        .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                        .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                }
+            }
+
+            return newNode;
+        }
+
+        /// <summary>
+        /// Override VisitBinaryExpression for operator access
+        /// </summary>
+        public override SyntaxNode VisitBinaryExpression(BinaryExpressionSyntax node)
+        {
+            var newNode = (BinaryExpressionSyntax)base.VisitBinaryExpression(node);
+
+            if (newNode.Kind() == SyntaxKind.EqualsExpression || newNode.Kind() == SyntaxKind.NotEqualsExpression)
+            {
+                var leftType = _semanticModel.GetTypeInfo(newNode.Left).Type;
+                var rightType = _semanticModel.GetTypeInfo(newNode.Right).Type;
+
+                if (leftType?.ToDisplayString() == "UnityEngine.Vector3" &&
+                    rightType?.ToDisplayString() == "UnityEngine.Vector3")
+                {
+                    ReplacementsCount++;
+
+                    string newNodeName;
+
+                    if (newNode.Kind() == SyntaxKind.EqualsExpression)
+                    {
+                        newNodeName = "equals";
+                    }
+                    else
+                    {
+                        newNodeName = "notEquals";
+                    }
+
+                    var argumentList = SyntaxFactory.ArgumentList(
+                        SyntaxFactory.SeparatedList(new[]
+                        {
+                            SyntaxFactory.Argument(newNode.Left),
+                            SyntaxFactory.Argument(newNode.Right)
+                        })
+                    );
+
+                    var memberAccess = SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName("Vector3ToFloat3Utils"),
+                        SyntaxFactory.IdentifierName(newNodeName)
+                    );
+
+                    var invocationExpression = SyntaxFactory.InvocationExpression(
+                        memberAccess,
+                        argumentList
+                    );
+
+                    return invocationExpression
+                        .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                        .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                }
+            }
+
+            return newNode;
+        }
+
+        /// <summary>
+        /// Override VisitInvocationExpression for method access
+        /// </summary>
+        public override SyntaxNode VisitInvocationExpression(InvocationExpressionSyntax node)
+        {
+            if (node.Expression is MemberAccessExpressionSyntax originalMemberAccess)
+            {
+                var originalSymbol = _semanticModel.GetSymbolInfo(originalMemberAccess).Symbol;
+
+                string originalName = originalMemberAccess.Name.Identifier.Text;
+
+                var newNode = (InvocationExpressionSyntax)base.VisitInvocationExpression(node);
+
+                if (newNode.Expression is MemberAccessExpressionSyntax memberAccess)
+                {
+                    string memberAccessName = memberAccess.Name.Identifier.Text;
+
+                    if ((originalSymbol is IMethodSymbol methodSymbol &&
+                        methodSymbol.ContainingType != null &&
+                        methodSymbol.ContainingType.ToDisplayString() == "UnityEngine.Vector3" &&
+                        methodSymbol.Parameters.Length == 2 &&
+                        methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                        methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3") &&
+                        (memberAccessName == "Angle" || memberAccessName == "Cross" || memberAccessName == "Distance" || memberAccessName == "Dot" ||
+                         memberAccessName == "Max" || memberAccessName == "Min" || memberAccessName == "Project" || memberAccessName == "ProjectOnPlane"))
+                    {
+                        ReplacementsCount++;
+
+                        string newName;
+
+                        if (originalName == "Angle")
+                        {
+                            newName = "Angle_deg";
+                        }
+                        else
+                        {
+                            newName = originalName;
+                        }
+
+                        var newMemberAccess = SyntaxFactory.MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            SyntaxFactory.IdentifierName("Vector3ToFloat3Utils"),
+                            SyntaxFactory.IdentifierName(newName)
+                        );
+
+                        var invocationExpression = SyntaxFactory.InvocationExpression(
+                            newMemberAccess,
+                            newNode.ArgumentList
+                        );
+
+                        return invocationExpression
+                            .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                            .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                    }
+
+                    if ((originalName == "Lerp" || originalName == "MoveTowards") &&
+                        originalSymbol is IMethodSymbol methodSymbol2 &&
+                        methodSymbol2.ContainingType != null &&
+                        methodSymbol2.ContainingType.ToDisplayString() == "UnityEngine.Vector3" &&
+                        methodSymbol2.Parameters.Length == 3 &&
+                        methodSymbol2.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                        methodSymbol2.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                        methodSymbol2.Parameters[2].Type.SpecialType == SpecialType.System_Single)
+                    {
+                        ReplacementsCount++;
+
+                        var newMemberAccess = SyntaxFactory.MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            SyntaxFactory.IdentifierName("Vector3ToFloat3Utils"),
+                            SyntaxFactory.IdentifierName(originalName)
+                        );
+
+                        var invocationExpression = SyntaxFactory.InvocationExpression(
+                            newMemberAccess,
+                            newNode.ArgumentList
+                        );
+
+                        return invocationExpression
+                            .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                            .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                    }
+
+                    if (originalName == "Normalize" &&
+                        originalSymbol is IMethodSymbol methodSymbol3 &&
+                        methodSymbol3.ContainingType != null &&
+                        methodSymbol3.ContainingType.ToDisplayString() == "UnityEngine.Vector3" &&
+                        methodSymbol3.Parameters.Length == 1 &&
+                        methodSymbol3.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3")
+                    {
+                        ReplacementsCount++;
+
+                        var originalArg = node.ArgumentList.Arguments[0];
+
+                        var argumentList = SyntaxFactory.ArgumentList(
+                            SyntaxFactory.SingletonSeparatedList(originalArg)
+                        );
+
+                        var newMemberAccess = SyntaxFactory.MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            SyntaxFactory.IdentifierName("Vector3ToFloat3Utils"),
+                            SyntaxFactory.IdentifierName("Normalize")
+                        );
+
+                        var invocationExpression = SyntaxFactory.InvocationExpression(
+                            newMemberAccess,
+                            argumentList
+                        );
+
+                        return invocationExpression
+                            .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                            .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                    }
+                }
+
+                return newNode;
+            }
+
+            return base.VisitInvocationExpression(node);
         }
     }
 }
