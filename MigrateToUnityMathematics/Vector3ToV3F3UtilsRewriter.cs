@@ -13,7 +13,7 @@ using Microsoft.CodeAnalysis.MSBuild;
 
 namespace UnityVector3Refactor
 {
-    class MigrateToUnityMathematics
+    class Vector3ToV3F3UtilsRewriter
     {
         static async Task Main(string[] args)
         {
@@ -137,7 +137,7 @@ namespace UnityVector3Refactor
                         var originalSyntaxTree = await document.GetSyntaxTreeAsync();
                         var originalSemanticModel = await document.GetSemanticModelAsync();
 
-                        var vector3ToFloat3Rewriter = new Vector3ToFloat3Rewriter(originalSemanticModel);
+                        var vector3ToFloat3Rewriter = new Vector3ToV3F3UtilsTransformer(originalSemanticModel);
                         var newSyntaxRoot = vector3ToFloat3Rewriter.Visit(originalSyntaxTree.GetRoot());
 
                         if (newSyntaxRoot != originalSyntaxTree.GetRoot())
@@ -166,12 +166,12 @@ namespace UnityVector3Refactor
     /// <summary>
     /// Rewrites Vector3 properties, methods, and operators
     /// </summary>
-    class Vector3ToFloat3Rewriter : CSharpSyntaxRewriter
+    class Vector3ToV3F3UtilsTransformer : CSharpSyntaxRewriter
     {
         private readonly SemanticModel _semanticModel;
         public int ReplacementsCount { get; private set; } = 0;
 
-        public Vector3ToFloat3Rewriter(SemanticModel semanticModel)
+        public Vector3ToV3F3UtilsTransformer(SemanticModel semanticModel)
         {
             _semanticModel = semanticModel;
         }
