@@ -56,19 +56,19 @@ namespace UnityVector3Refactor
         //public static float3 zero => new float3(0, 0, 0);
         public static Vector3 zero => new Vector3(0, 0, 0);
 
-        public static bool equals(Vector3 v1, Vector3 v2)
+        public static bool Equals(Vector3 v1, Vector3 v2)
         {
             return v1 == v2;
         }
-        public static bool equals(float3 v1, float3 v2)
+        public static bool Equals(float3 v1, float3 v2)
         {
             return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z;
         }
-        public static bool notEquals(Vector3 v1, Vector3 v2)
+        public static bool NotEquals(Vector3 v1, Vector3 v2)
         {
             return v1 != v2;
         }
-        public static bool notEquals(float3 v1, float3 v2)
+        public static bool NotEquals(float3 v1, float3 v2)
         {
             return v1.x != v2.x || v1.y != v2.y || v1.z != v2.z;
         }
@@ -173,14 +173,25 @@ namespace UnityVector3Refactor
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Normalize(Vector3 v)
+        public static void Normalize(ref Vector3 v)
         {
             v.Normalize();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Normalize(float3 v)
+        public static void Normalize(ref float3 v)
         {
             v = math.normalize(v);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Vector3 Normalize(Vector3 v)
+        {
+            v.Normalize();
+            return v;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float3 Normalize(float3 v)
+        {
+            return math.normalize(v);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
