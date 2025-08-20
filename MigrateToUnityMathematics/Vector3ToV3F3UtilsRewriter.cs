@@ -17,22 +17,28 @@ namespace UnityVector3Refactor
     {
         static async Task Main(string[] args)
         {
-            Console.WriteLine("Unity Vector3.magnitude Refactor Tool");
+            Console.WriteLine("Unity Vector3 Refactor Tool");
             Console.WriteLine("------------------------------------");
 
             if (args.Length == 0)
             {
-                Console.WriteLine("Usage: UnityVector3Refactor <path_to_unity_project_or_solution_file>");
-                Console.WriteLine("Example: UnityVector3Refactor \"C:\\MyUnityProject\\MyUnityProject.sln\"");
-                Console.WriteLine("Or: UnityVector3Refactor \"C:\\MyUnityProject\\Assets\\Scripts\"");
+                Console.WriteLine("Usage: Vector3ToFloat3MigrationP1 <path_to_unity_project_or_solution_file>");
+                Console.WriteLine("Example: Vector3ToFloat3MigrationP1 \"C:\\MyUnityProject\\MyUnityProject.sln\"");
+                Console.WriteLine("Or: Vector3ToFloat3MigrationP1 \"C:\\MyUnityProject\\Assets\\Scripts\"");
+
+                Console.WriteLine("Usage: Vector3ToFloat3MigrationP1 <path_to_unity_project_or_solution_file> [optional: <path_to_config_file>]");
+                Console.WriteLine("Example with config file: dotnet run --project Vector3ToFloat3MigrationP1.csproj " +
+                                  "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" " +
+                                  "\"C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\MigrateToUnityMathematics\\config.txt\"");
+                Console.WriteLine("dotnet run --project Vector3ToFloat3MigrationP1.csproj " +
+                                  "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" ");
                 return;
             }
 
             /*
             MSBuildLocator.RegisterDefaults(); // Registers installed MSBuild instance
 
-            ^This was not working for me, replaced with RegisterMSBuildPath() and used:
-            dotnet run --project MigrateToUnityMathematics.csproj -- "C:\Users\rowan\Workspace\Unity\Vector3ToFloat3MigrationTestingUnity\Assembly-CSharp.csproj"
+            ^This was not working for me, replaced with RegisterMSBuildPath()
             */
 
             const string msBuildPath = @"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin";
@@ -56,8 +62,25 @@ namespace UnityVector3Refactor
                 Console.WriteLine($"Error: Path '{fullPath}' does not exist.");
                 return;
             }
-
             Console.WriteLine($"Processing: {fullPath}");
+
+            AllowedNamespacesAndExcludedFilesFinder config;
+            if (args.Length > 1)
+            {
+                string configPath = Path.GetFullPath(args[1]);
+                config = new AllowedNamespacesAndExcludedFilesFinder(configPath);
+
+                Console.WriteLine("Excluded File Names:");
+                Console.WriteLine(string.Join(", ", config.ExcludedFileNames));
+
+                Console.WriteLine("Allowed Namespaces:");
+                Console.WriteLine(string.Join(", ", config.AllowedNamespaces));
+            }
+            else
+            {
+                Console.WriteLine("No config file specified. Using all namespaces, excluding no files");
+                config = new AllowedNamespacesAndExcludedFilesFinder(null);
+            }
 
             var workspace = MSBuildWorkspace.Create();
 
@@ -125,27 +148,47 @@ namespace UnityVector3Refactor
                     Console.WriteLine("Skipping non-C# project.");
                     continue;
                 }
-
                 foreach (var document in project.Documents)
                 {
-                    if (document.SourceCodeKind == SourceCodeKind.Regular &&
-                        document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
-                        !document.Name.Contains("Vector3ToFloat3Utils")) // Make sure not to change the file with the wrappers
+                    if (document.SourceCodeKind != SourceCodeKind.Regular ||
+                        !document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                        document.Name.Contains("Vector3ToFloat3Utils"))
                     {
-                        Console.WriteLine($"  Processing document: {Path.GetFileName(document.FilePath)}");
+                        continue;
+                    }
 
-                        var originalSyntaxTree = await document.GetSyntaxTreeAsync();
-                        var originalSemanticModel = await document.GetSemanticModelAsync();
+                    var root = await document.GetSyntaxRootAsync();
+                    var namespaceNode = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().FirstOrDefault();
+                    string ns = "";
+                    if (namespaceNode != null)
+                    {
+                        ns = namespaceNode.Name.ToString();
+                    }
 
-                        var vector3ToFloat3Rewriter = new Vector3ToV3F3UtilsTransformer(originalSemanticModel);
-                        var newSyntaxRoot = vector3ToFloat3Rewriter.Visit(originalSyntaxTree.GetRoot());
+                    if (config.IsFileExcluded(document.Name))
+                    {
+                        Console.WriteLine($"  Did not process document: {Path.GetFileName(document.FilePath)} - File Name excluded");
+                        continue;
+                    }
+                    if (!config.IsNamespaceAllowed(ns))
+                    {
+                        Console.WriteLine($"  Did not process document: {Path.GetFileName(document.FilePath)} - Namespace ({ns}) not included");
+                        continue;
+                    }
 
-                        if (newSyntaxRoot != originalSyntaxTree.GetRoot())
-                        {
-                            totalReplacements += vector3ToFloat3Rewriter.ReplacementsCount;
-                            solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
-                            Console.WriteLine($"    Replaced " + $"{totalReplacements} instances in {Path.GetFileName(document.FilePath)}");
-                        }
+                    Console.WriteLine($"  Processing document: {Path.GetFileName(document.FilePath)}");
+
+                    var originalSyntaxTree = await document.GetSyntaxTreeAsync();
+                    var originalSemanticModel = await document.GetSemanticModelAsync();
+
+                    var Vector3WrapperToMathRewriter = new Vector3ToV3F3UtilsTransformer(originalSemanticModel);
+                    var newSyntaxRoot = Vector3WrapperToMathRewriter.Visit(originalSyntaxTree.GetRoot());
+
+                    if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                    {
+                        totalReplacements += Vector3WrapperToMathRewriter.ReplacementsCount;
+                        solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
+                        Console.WriteLine($"    Replaced {Vector3WrapperToMathRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
                     }
                 }
             }
@@ -154,7 +197,7 @@ namespace UnityVector3Refactor
             if (workspace.TryApplyChanges(solution))
             {
                 Console.WriteLine($"Successfully applied all changes. Total replacements: {totalReplacements}");
-                Console.WriteLine("Remember to add the Vector3Utils.cs file to your Unity project if you haven't already.");
+                Console.WriteLine("Remember to add the Vector3ToFloat3Utils.cs file to your Unity project if you haven't already.");
             }
             else
             {
@@ -213,7 +256,7 @@ namespace UnityVector3Refactor
 
                     var invocationExpression = SyntaxFactory.InvocationExpression(
                         memberAccess,
-                        argumentList
+                        argumentList.NormalizeWhitespace()
                     );
 
                     return invocationExpression
@@ -291,7 +334,7 @@ namespace UnityVector3Refactor
 
                     var invocationExpression = SyntaxFactory.InvocationExpression(
                         memberAccess,
-                        argumentList
+                        argumentList.NormalizeWhitespace()
                     );
 
                     return invocationExpression
@@ -350,7 +393,7 @@ namespace UnityVector3Refactor
 
                         var invocationExpression = SyntaxFactory.InvocationExpression(
                             newMemberAccess,
-                            newNode.ArgumentList
+                            newNode.ArgumentList.NormalizeWhitespace()
                         );
 
                         return invocationExpression
@@ -377,7 +420,7 @@ namespace UnityVector3Refactor
 
                         var invocationExpression = SyntaxFactory.InvocationExpression(
                             newMemberAccess,
-                            newNode.ArgumentList
+                            newNode.ArgumentList.NormalizeWhitespace()
                         );
 
                         return invocationExpression
@@ -408,7 +451,7 @@ namespace UnityVector3Refactor
 
                         var invocationExpression = SyntaxFactory.InvocationExpression(
                             newMemberAccess,
-                            argumentList
+                            argumentList.NormalizeWhitespace()
                         );
 
                         return invocationExpression
@@ -421,6 +464,56 @@ namespace UnityVector3Refactor
             }
 
             return base.VisitInvocationExpression(node);
+        }
+    }
+
+    public class AllowedNamespacesAndExcludedFilesFinder
+    {
+        public HashSet<string> AllowedNamespaces { get; } = new();
+        public HashSet<string> ExcludedFileNames { get; } = new();
+
+        public AllowedNamespacesAndExcludedFilesFinder(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                Console.WriteLine($"Config file '{filePath}' not found. Using defaults (all namespaces allowed, no excluded files).");
+                return;
+            }
+
+            var lines = File.ReadAllLines(filePath).Select(l => l.Trim()).Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith("#")).ToList();
+
+            bool readingAllowedNamespaces = false;
+            bool readingExcludedFileNames = false;
+
+            foreach (var line in lines)
+            {
+                if (line.Equals("ALLOWED_NAMESPACES:", StringComparison.OrdinalIgnoreCase))
+                {
+                    readingAllowedNamespaces = true;
+                    readingExcludedFileNames = false;
+                    continue;
+                }
+
+                if (line.Equals("EXCLUDED_FILENAMES:", StringComparison.OrdinalIgnoreCase))
+                {
+                    readingAllowedNamespaces = false;
+                    readingExcludedFileNames = true;
+                    continue;
+                }
+
+                if (readingAllowedNamespaces)
+                    AllowedNamespaces.Add(line);
+                else if (readingExcludedFileNames)
+                    ExcludedFileNames.Add(line);
+            }
+        }
+        public bool IsNamespaceAllowed(string ns)
+        {
+            return AllowedNamespaces.Count == 0 || AllowedNamespaces.Contains(ns);
+        }
+        public bool IsFileExcluded(string fileName)
+        {
+            return ExcludedFileNames.Contains(fileName);
         }
     }
 }

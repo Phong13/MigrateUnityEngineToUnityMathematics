@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace MigrateToUnityMathematics
+namespace UnityVector3Refactor
 {
     public static class Vector3ToFloat3Utils
     {
@@ -129,6 +129,7 @@ namespace MigrateToUnityMathematics
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float3 Lerp(float3 v1, float3 v2, float t)
         {
+            t = math.clamp(t, 0f, 1f);
             return math.lerp(v1, v2, t);
         }
 

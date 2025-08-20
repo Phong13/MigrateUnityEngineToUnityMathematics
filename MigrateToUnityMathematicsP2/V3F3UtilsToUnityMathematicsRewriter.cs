@@ -18,14 +18,14 @@ namespace UnityVector3Refactor
     {
         static async Task Main(string[] args)
         {
-            Console.WriteLine("Unity Vector3.magnitude Refactor Tool");
+            Console.WriteLine("Unity Vector3 Refactor Tool");
             Console.WriteLine("------------------------------------");
 
             if (args.Length == 0)
             {
-                Console.WriteLine("Usage: UnityVector3Refactor <path_to_unity_project_or_solution_file>");
-                Console.WriteLine("Example: UnityVector3Refactor \"C:\\MyUnityProject\\MyUnityProject.sln\"");
-                Console.WriteLine("Or: UnityVector3Refactor \"C:\\MyUnityProject\\Assets\\Scripts\"");
+                Console.WriteLine("Usage: Vector3ToFloat3MigrationP2 <path_to_unity_project_or_solution_file>");
+                Console.WriteLine("Example: Vector3ToFloat3MigrationP2 \"C:\\MyUnityProject\\MyUnityProject.sln\"");
+                Console.WriteLine("Or: Vector3ToFloat3MigrationP2 \"C:\\MyUnityProject\\Assets\\Scripts\"");
                 return;
             }
 
@@ -155,7 +155,7 @@ namespace UnityVector3Refactor
             if (workspace.TryApplyChanges(solution))
             {
                 Console.WriteLine($"Successfully applied all changes. Total replacements: {totalReplacements}");
-                Console.WriteLine("Remember to add the Vector3Utils.cs file to your Unity project if you haven't already.");
+                Console.WriteLine("Remember to add the Vector3ToFloat3Utils.cs file to your Unity project if you haven't already.");
             }
             else
             {
