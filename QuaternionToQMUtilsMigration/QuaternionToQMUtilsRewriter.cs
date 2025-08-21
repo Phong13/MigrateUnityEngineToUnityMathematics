@@ -24,7 +24,7 @@ namespace MigrateToUnityMathematics
                 Console.WriteLine("Usage: QuaternionToQMUtilsMigration <path_to_unity_project_or_solution_file> [optional: <path_to_config_file>]");
                 Console.WriteLine("Example with config file: dotnet run --project QuaternionToQMUtilsMigration.csproj " +
                                   "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" " +
-                                  "\"C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\QuaternionToQMUtilsMigration\\config.txt\"");
+                                  "C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\config.txt\"");
                 Console.WriteLine("dotnet run --project QuaternionToQMUtilsMigration.csproj " +
                                   "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" ");
 
@@ -148,7 +148,8 @@ namespace MigrateToUnityMathematics
                 {
                     if (document.SourceCodeKind != SourceCodeKind.Regular ||
                         !document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
-                        document.Name.Contains("QuaternionToQMUtils"))
+                        document.Name.Contains("Vector3ToFloat3Utils") ||
+                        document.Name.Contains("QuaternionToMathematicsUtils"))
                     {
                         continue;
                     }

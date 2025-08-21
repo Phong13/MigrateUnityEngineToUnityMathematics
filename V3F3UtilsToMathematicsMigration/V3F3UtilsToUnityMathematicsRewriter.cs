@@ -25,7 +25,7 @@ namespace UnityVector3Refactor
                 Console.WriteLine("Usage: V3F3UtilsToMathematicsMigration <path_to_unity_project_or_solution_file> [optional: <path_to_config_file>]");
                 Console.WriteLine("Example with config file: dotnet run --project V3F3UtilsToMathematicsMigration.csproj " +
                                   "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" " +
-                                  "\"C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\V3F3UtilsToMathematicsMigration\\config.txt\"");
+                                  "C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\config.txt\"");
                 Console.WriteLine("dotnet run --project V3F3UtilsToMathematicsMigration.csproj " +
                                   "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" ");
                 return;
@@ -148,7 +148,8 @@ namespace UnityVector3Refactor
                 {
                     if (document.SourceCodeKind != SourceCodeKind.Regular ||
                         !document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
-                        document.Name.Contains("Vector3ToFloat3Utils"))
+                        document.Name.Contains("Vector3ToFloat3Utils") ||
+                        document.Name.Contains("QuaternionToMathematicsUtils"))
                     {
                         continue;
                     }

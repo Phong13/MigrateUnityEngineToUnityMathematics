@@ -56,12 +56,12 @@ Add Vector3ToFloat3Utils.cs to your project (or the Quaternion wrapper equivalen
 STEP 3
 
 Navigate to where your project is saved and run the rewriter with either:
-    -Vector3ToFloat3MigrationP1 "path_to_unity_project_or_solution_file"
+    -Vector3ToV3F3UtilsMigration "path_to_unity_project_or_solution_file"
     or
-    -Vector3ToFloat3MigrationP1 "path_to_unity_project_or_solution_file" "path_to_config_file"
+    -Vector3ToV3F3UtilsMigration "path_to_unity_project_or_solution_file" "path_to_config_file"
 
 Example WITHOUT config file:
-    dotnet run --project Vector3ToFloat3MigrationP1.csproj -- "C:\Users\rowan\Workspace\Unity\Vector3ToFloat3UtilsTesting\Assembly-CSharp.csproj" 
+    dotnet run --project Vector3ToV3F3UtilsMigration.csproj -- "C:\Users\rowan\Workspace\Unity\Vector3ToFloat3UtilsTesting\Assembly-CSharp.csproj" 
 Example WITH config file: 
-    dotnet run --project Vector3ToFloat3MigrationP1.csproj -- "C:\Users\rowan\Workspace\Unity\Vector3ToFloat3UtilsTesting\Assembly-CSharp.csproj" "C:\Users\rowan\Workspace\Unity\MigrateUnityEngineToUnityMathematics\MigrateToUnityMathematics\config.txt"
+    dotnet run --project Vector3ToV3F3UtilsMigration.csproj -- "C:\Users\rowan\Workspace\Unity\Vector3ToFloat3UtilsTesting\Assembly-CSharp.csproj" "C:\Users\rowan\Workspace\Unity\MigrateUnityEngineToUnityMathematics\config.txt"
     
