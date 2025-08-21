@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35027.167
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vector3ToV3F3UtilsMigration", "Vector3ToV3F3UtilsMigration\Vector3ToV3F3UtilsMigration.csproj", "{9ECA0508-934E-4EBB-944F-7BFDFCF1572A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "V3F3UtilsToMathematicsMigration", "V3F3UtilsToMathematicsMigration\V3F3UtilsToMathematicsMigration.csproj", "{15D70CA9-951D-E441-3118-3B8C8D408BF6}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9ECA0508-934E-4EBB-944F-7BFDFCF1572A} = {9ECA0508-934E-4EBB-944F-7BFDFCF1572A}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuaternionToQMUtilsMigration", "QuaternionToQMUtilsMigration\QuaternionToQMUtilsMigration.csproj", "{A911B70B-2494-4EAB-B4C8-EADD0233731D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QMUtilsToMathematicsMigration", "QMUtilsToMathematicsMigration\QMUtilsToMathematicsMigration.csproj", "{D5E8D2EC-00C4-4B58-BE25-49EC51E1EDC2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9ECA0508-934E-4EBB-944F-7BFDFCF1572A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9ECA0508-934E-4EBB-944F-7BFDFCF1572A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9ECA0508-934E-4EBB-944F-7BFDFCF1572A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9ECA0508-934E-4EBB-944F-7BFDFCF1572A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15D70CA9-951D-E441-3118-3B8C8D408BF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15D70CA9-951D-E441-3118-3B8C8D408BF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15D70CA9-951D-E441-3118-3B8C8D408BF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15D70CA9-951D-E441-3118-3B8C8D408BF6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A911B70B-2494-4EAB-B4C8-EADD0233731D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A911B70B-2494-4EAB-B4C8-EADD0233731D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A911B70B-2494-4EAB-B4C8-EADD0233731D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A911B70B-2494-4EAB-B4C8-EADD0233731D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D5E8D2EC-00C4-4B58-BE25-49EC51E1EDC2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D5E8D2EC-00C4-4B58-BE25-49EC51E1EDC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5E8D2EC-00C4-4B58-BE25-49EC51E1EDC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D5E8D2EC-00C4-4B58-BE25-49EC51E1EDC2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CA2A5A5E-268D-4976-BF06-B84E2DFC1CB2}
+	EndGlobalSection
+EndGlobal
