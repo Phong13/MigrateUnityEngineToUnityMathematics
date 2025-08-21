@@ -1,6 +1,0 @@
-ALLOWED_NAMESPACES:
-UnityVector3Refactor
-
-EXCLUDED_FILENAMES:
-Vector3ToFloat3Utils.cs
-ThisShouldNotWork.cs
