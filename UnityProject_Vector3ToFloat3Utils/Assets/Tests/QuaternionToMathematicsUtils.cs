@@ -321,6 +321,18 @@ public static class QuaternionToMathematicsUtils
     {
         q = math.normalize(q);
     }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Quaternion Normalize(Quaternion q)
+    {
+        q = UnityEngine.Quaternion.Normalize(q);
+        return q;
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static quaternion Normalize(quaternion q)
+    {
+        q = math.normalize(q);
+        return q;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion RotateTowards(Quaternion from, Quaternion to, float maxDegreesDelta)

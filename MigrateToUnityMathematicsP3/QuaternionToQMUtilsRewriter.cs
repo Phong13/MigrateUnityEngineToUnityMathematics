@@ -1,14 +1,14 @@
-﻿using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.MSBuild;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-
 using Microsoft.Build.Locator;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.MSBuild;
+using UnityVector3Refactor;
 
 namespace MigrateToUnityMathematics
 {
@@ -21,17 +21,20 @@ namespace MigrateToUnityMathematics
 
             if (args.Length == 0)
             {
-                Console.WriteLine("Usage: UnityQuaternionRefactor <path_to_unity_project_or_solution_file>");
-                Console.WriteLine("Example: UnityQuaternionRefactor \"C:\\MyUnityProject\\MyUnityProject.sln\"");
-                Console.WriteLine("Or: UnityQuaternionRefactor \"C:\\MyUnityProject\\Assets\\Scripts\"");
+                Console.WriteLine("Usage: Vector3ToFloat3MigrationP1 <path_to_unity_project_or_solution_file> [optional: <path_to_config_file>]");
+                Console.WriteLine("Example with config file: dotnet run --project Vector3ToFloat3MigrationP1.csproj " +
+                                  "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" " +
+                                  "\"C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\MigrateToUnityMathematics\\config.txt\"");
+                Console.WriteLine("dotnet run --project Vector3ToFloat3MigrationP1.csproj " +
+                                  "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" ");
+
                 return;
             }
 
             /*
             MSBuildLocator.RegisterDefaults(); // Registers installed MSBuild instance
 
-            ^This was not working for me, replaced with RegisterMSBuildPath() and used:
-            dotnet run --project MigrateToUnityMathematics.csproj -- "C:\Users\rowan\Workspace\Unity\Vector3ToFloat3MigrationTestingUnity\Assembly-CSharp.csproj"
+            ^This was not working for me, replaced with RegisterMSBuildPath()
             */
 
             const string msBuildPath = @"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin";
@@ -55,8 +58,25 @@ namespace MigrateToUnityMathematics
                 Console.WriteLine($"Error: Path '{fullPath}' does not exist.");
                 return;
             }
-
             Console.WriteLine($"Processing: {fullPath}");
+
+            AllowedNamespacesAndExcludedFilesFinder config;
+            if (args.Length > 1)
+            {
+                string configPath = Path.GetFullPath(args[1]);
+                config = new AllowedNamespacesAndExcludedFilesFinder(configPath);
+
+                Console.WriteLine("Excluded File Names:");
+                Console.WriteLine("  " + string.Join(", ", config.ExcludedFileNames));
+
+                Console.WriteLine("Allowed Namespaces:");
+                Console.WriteLine("  " + string.Join(", ", config.AllowedNamespaces));
+            }
+            else
+            {
+                Console.WriteLine("No config file specified. Using all namespaces, excluding no files");
+                config = new AllowedNamespacesAndExcludedFilesFinder(null);
+            }
 
             var workspace = MSBuildWorkspace.Create();
 
@@ -124,27 +144,47 @@ namespace MigrateToUnityMathematics
                     Console.WriteLine("Skipping non-C# project.");
                     continue;
                 }
-
                 foreach (var document in project.Documents)
                 {
-                    if (document.SourceCodeKind == SourceCodeKind.Regular &&
-                        document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
-                        !document.Name.Contains("QuaternionToMathematicsUtils")) // Make sure not to change the file with the wrappers
+                    if (document.SourceCodeKind != SourceCodeKind.Regular ||
+                        !document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                        document.Name.Contains("QuaternionToQMUtils"))
                     {
-                        Console.WriteLine($"  Processing document: {Path.GetFileName(document.FilePath)}");
+                        continue;
+                    }
 
-                        var originalSyntaxTree = await document.GetSyntaxTreeAsync();
-                        var originalSemanticModel = await document.GetSemanticModelAsync();
+                    var root = await document.GetSyntaxRootAsync();
+                    var namespaceNode = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().FirstOrDefault();
+                    string ns = "";
+                    if (namespaceNode != null)
+                    {
+                        ns = namespaceNode.Name.ToString();
+                    }
 
-                        var Vector3WrapperToMathRewriter = new QuaternionToMathematicsRewriter(originalSemanticModel);
-                        var newSyntaxRoot = Vector3WrapperToMathRewriter.Visit(originalSyntaxTree.GetRoot());
+                    if (config.IsFileExcluded(document.Name))
+                    {
+                        Console.WriteLine($"  Did not process document: {Path.GetFileName(document.FilePath)} - File Name excluded");
+                        continue;
+                    }
+                    if (!config.IsNamespaceAllowed(ns))
+                    {
+                        Console.WriteLine($"  Did not process document: {Path.GetFileName(document.FilePath)} - Namespace ({ns}) not included");
+                        continue;
+                    }
 
-                        if (newSyntaxRoot != originalSyntaxTree.GetRoot())
-                        {
-                            totalReplacements += Vector3WrapperToMathRewriter.ReplacementsCount;
-                            solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
-                            Console.WriteLine($"    Replaced " + $"{totalReplacements} instances in {Path.GetFileName(document.FilePath)}");
-                        }
+                    Console.WriteLine($"  Processing document: {Path.GetFileName(document.FilePath)}");
+
+                    var originalSyntaxTree = await document.GetSyntaxTreeAsync();
+                    var originalSemanticModel = await document.GetSemanticModelAsync();
+
+                    var QuaternionToQMUtilsRewriter = new QuaternionToQMUtilsTransformer(originalSemanticModel);
+                    var newSyntaxRoot = QuaternionToQMUtilsRewriter.Visit(originalSyntaxTree.GetRoot());
+
+                    if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                    {
+                        totalReplacements += QuaternionToQMUtilsRewriter.ReplacementsCount;
+                        solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
+                        Console.WriteLine($"    Replaced {QuaternionToQMUtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
                     }
                 }
             }
@@ -153,7 +193,7 @@ namespace MigrateToUnityMathematics
             if (workspace.TryApplyChanges(solution))
             {
                 Console.WriteLine($"Successfully applied all changes. Total replacements: {totalReplacements}");
-                Console.WriteLine("Remember to add the Vector3Utils.cs file to your Unity project if you haven't already.");
+                Console.WriteLine("Remember to add the QuaternionToQMUtils.cs file to your Unity project if you haven't already.");
             }
             else
             {
@@ -162,33 +202,33 @@ namespace MigrateToUnityMathematics
         }
     }
 
-    class QuaternionToMathematicsRewriter : CSharpSyntaxRewriter
+    class QuaternionToQMUtilsTransformer : CSharpSyntaxRewriter
     {
         private readonly SemanticModel _semanticModel;
         public int ReplacementsCount { get; private set; } = 0;
 
-        public QuaternionToMathematicsRewriter(SemanticModel semanticModel)
+        public QuaternionToQMUtilsTransformer(SemanticModel semanticModel)
         {
             _semanticModel = semanticModel;
         }
 
         public override SyntaxNode VisitBinaryExpression(BinaryExpressionSyntax node)
         {
+            var originalLeftType = _semanticModel.GetTypeInfo(node.Left).Type;
+            var originalRightType = _semanticModel.GetTypeInfo(node.Right).Type;
+            var originalKind = node.Kind();
+
             var newNode = (BinaryExpressionSyntax)base.VisitBinaryExpression(node);
 
-            if (newNode.Kind() == SyntaxKind.EqualsExpression || newNode.Kind() == SyntaxKind.MultiplyExpression)
+            if (originalKind == SyntaxKind.EqualsExpression || originalKind == SyntaxKind.MultiplyExpression)
             {
-                var leftType = _semanticModel.GetTypeInfo(newNode.Left).Type;
-                var rightType = _semanticModel.GetTypeInfo(newNode.Right).Type;
-
-                if (leftType?.ToDisplayString() == "UnityEngine.Quaternion" &&
-                    rightType?.ToDisplayString() == "UnityEngine.Quaternion")
+                if (originalLeftType?.ToDisplayString() == "UnityEngine.Quaternion" &&
+                    originalRightType?.ToDisplayString() == "UnityEngine.Quaternion")
                 {
                     ReplacementsCount++;
 
                     string newNodeName;
-
-                    if (newNode.Kind() == SyntaxKind.EqualsExpression)
+                    if (originalKind == SyntaxKind.EqualsExpression)
                     {
                         newNodeName = "Equals";
                     }
@@ -238,7 +278,7 @@ namespace MigrateToUnityMathematics
                 propSymbol.ContainingType.ToDisplayString() == "UnityEngine.Quaternion" &&
                 propSymbol.ContainingType.ContainingNamespace?.ToDisplayString() == "UnityEngine")
             {
-                if (memberName == "eulerAngles" || memberName == "normalized" || memberName == "w" || memberName == "x" || memberName == "y" || memberName == "z")
+                if (memberName == "eulerAngles" || memberName == "normalized")
                 {
                     ReplacementsCount++;
 
@@ -279,6 +319,32 @@ namespace MigrateToUnityMathematics
                     );
 
                     return replacement
+                        .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                        .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                }
+            }
+            else if (originalSymbol is IFieldSymbol fieldSymbol &&
+                     fieldSymbol.ContainingType?.ToDisplayString() == "UnityEngine.Quaternion")
+            {
+                if (memberName == "x" || memberName == "y" || memberName == "z" || memberName == "w")
+                {
+                    ReplacementsCount++;
+
+                    var expression = newNode.Expression;
+
+                    var argumentList = SyntaxFactory.ArgumentList(
+                        SyntaxFactory.SingletonSeparatedList(
+                            SyntaxFactory.Argument(expression.WithoutTrivia())
+                        )
+                    );
+
+                    var memberAccess = SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName("QuaternionToMathematicsUtils"),
+                        SyntaxFactory.IdentifierName(memberName)
+                    );
+
+                    return SyntaxFactory.InvocationExpression(memberAccess, argumentList)
                         .WithLeadingTrivia(newNode.GetLeadingTrivia())
                         .WithTrailingTrivia(newNode.GetTrailingTrivia());
                 }
@@ -400,7 +466,7 @@ namespace MigrateToUnityMathematics
                             methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" &&
                             (memberAccessName == "AngleAxis"))
                         {
-                            if (newName == "AngleAxis") newName = "AngleAxis"; //Switch this later
+                            if (newName == "AngleAxis") newName = "AngleAxis_deg";
 
                             return CreateReplacementInvocation(newName, newNode.ArgumentList, newNode);
                         }
@@ -409,7 +475,7 @@ namespace MigrateToUnityMathematics
                             methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
                             (memberAccessName == "Euler" || memberAccessName == "LookRotation"))
                         {
-                            if (newName == "Euler") newName = "Euler"; //Switch this later
+                            if (newName == "Euler") newName = "Euler_deg";
 
                             return CreateReplacementInvocation(newName, newNode.ArgumentList, newNode);
                         }
@@ -424,9 +490,25 @@ namespace MigrateToUnityMathematics
 
                         if (methodSymbol.Parameters.Length == 1 &&
                             methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Quaternion" &&
+                            methodSymbol.IsStatic &&
                             (memberAccessName == "Inverse" || memberAccessName == "Normalize"))
                         {
                             return CreateReplacementInvocation(newName, newNode.ArgumentList, newNode);
+                        }
+                        if (methodSymbol.Parameters.Length == 0 &&
+                            methodSymbol.ContainingType.ToString() == "UnityEngine.Quaternion" &&
+                            !methodSymbol.IsStatic &&
+                            memberAccessName == "Normalize")
+                        {
+                            var instanceExpr = ((MemberAccessExpressionSyntax)newNode.Expression).Expression;
+
+                            var refArg = SyntaxFactory.Argument(instanceExpr)
+                                .WithRefKindKeyword(SyntaxFactory.Token(SyntaxKind.RefKeyword));
+
+                            var args = SyntaxFactory.SingletonSeparatedList(refArg);
+
+                            return CreateReplacementInvocation("Normalize",
+                                SyntaxFactory.ArgumentList(args), newNode);
                         }
 
                         if (methodSymbol.Parameters.Length == 3 &&
@@ -446,7 +528,87 @@ namespace MigrateToUnityMathematics
                             methodSymbol.Parameters[2].Type.SpecialType == SpecialType.System_Single &&
                             (memberAccessName == "Euler"))
                         {
+                            newName = "Euler_deg";
+
                             return CreateReplacementInvocation(newName, newNode.ArgumentList, newNode);
+                        }
+                        if (methodSymbol.Parameters.Length == 4 &&
+                            methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_Single &&
+                            methodSymbol.Parameters[1].Type.SpecialType == SpecialType.System_Single &&
+                            methodSymbol.Parameters[2].Type.SpecialType == SpecialType.System_Single &&
+                            methodSymbol.Parameters[3].Type.SpecialType == SpecialType.System_Single &&
+                            memberAccessName == "Set")
+                        {
+                            var instanceExpr = memberAccess.Expression;
+                            var refArg = SyntaxFactory.Argument(instanceExpr)
+                                .WithRefKindKeyword(SyntaxFactory.Token(SyntaxKind.RefKeyword));
+
+                            var args = newNode.ArgumentList.Arguments.Insert(0, refArg);
+
+                            return CreateReplacementInvocation(newName,
+                                SyntaxFactory.ArgumentList(args), newNode);
+                        }
+
+                        if (methodSymbol.Parameters.Length == 2 &&
+                            methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            (memberAccessName == "SetFromToRotation" || memberAccessName == "SetLookRotation"))
+                        {
+                            var instanceExpr = memberAccess.Expression;
+                            var refArg = SyntaxFactory.Argument(instanceExpr)
+                                .WithRefKindKeyword(SyntaxFactory.Token(SyntaxKind.RefKeyword));
+
+                            var args = newNode.ArgumentList.Arguments.Insert(0, refArg);
+
+                            return CreateReplacementInvocation(newName,
+                                SyntaxFactory.ArgumentList(args), newNode);
+                        }
+
+                        if (methodSymbol.Parameters.Length == 1 &&
+                            methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            memberAccessName == "SetLookRotation")
+                        {
+                            var instanceExpr = memberAccess.Expression;
+                            var refArg = SyntaxFactory.Argument(instanceExpr)
+                                .WithRefKindKeyword(SyntaxFactory.Token(SyntaxKind.RefKeyword));
+
+                            var args = newNode.ArgumentList.Arguments.Insert(0, refArg);
+
+                            return CreateReplacementInvocation(newName,
+                                SyntaxFactory.ArgumentList(args), newNode);
+                        }
+
+                        if (methodSymbol.Parameters.Length == 2 &&
+                            methodSymbol.Parameters[0].RefKind == RefKind.Out &&
+                            methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_Single &&
+                            methodSymbol.Parameters[1].RefKind == RefKind.Out &&
+                            methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            memberAccessName == "ToAngleAxis")
+                        {
+                            newName = "ToAngleAxis_deg";
+                            var instanceExpr = memberAccess.Expression;
+                            var refArg = SyntaxFactory.Argument(instanceExpr)
+                                .WithRefKindKeyword(SyntaxFactory.Token(SyntaxKind.RefKeyword));
+
+                            var args = newNode.ArgumentList.Arguments.Insert(0, refArg);
+
+                            return CreateReplacementInvocation(newName,
+                                SyntaxFactory.ArgumentList(args), newNode);
+                        }
+                        if (memberAccessName == "ToString" &&
+                            methodSymbol.Parameters.Length == 0 &&
+                            methodSymbol.ContainingType.ToString() == "UnityEngine.Quaternion" &&
+                            !methodSymbol.IsStatic)
+                        {
+                            var instanceExpr = memberAccess.Expression;
+
+                            var args = SyntaxFactory.SeparatedList(new[]
+                            {
+                                SyntaxFactory.Argument(instanceExpr)
+                            });
+
+                            return CreateReplacementInvocation("ToString",
+                                SyntaxFactory.ArgumentList(args), newNode);
                         }
                     }
 
@@ -456,6 +618,29 @@ namespace MigrateToUnityMathematics
 
             return base.VisitInvocationExpression(node);
         }
+        public override SyntaxNode VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
+        {
+            var symbol = _semanticModel.GetSymbolInfo(node).Symbol as IMethodSymbol;
+
+            if (symbol == null) return base.VisitObjectCreationExpression(node);
+
+            if (symbol.ContainingType.ToString() == "UnityEngine.Quaternion" &&
+                symbol.Parameters.Length == 4 &&
+                symbol.Parameters.All(p => p.Type.SpecialType == SpecialType.System_Single))
+            {
+                return CreateReplacementInvocation(
+                    "Quaternion",
+                    node.ArgumentList,
+                    node
+                );
+            }
+
+            return base.VisitObjectCreationExpression(node);
+        }
+        //TESTs FOR NORMALIZE
+        //TESTS FOR SETLookRotation
+        //Quaternion, public methods, wxyz
+        //math.up instead of new float(0,1,0)
 
         private InvocationExpressionSyntax CreateReplacementInvocation(string newName, ArgumentListSyntax arguments, SyntaxNode originalNode)
         {
@@ -477,27 +662,56 @@ namespace MigrateToUnityMathematics
                 .WithTrailingTrivia(originalNode.GetTrailingTrivia()); ;
         }
     }
+
+    public class AllowedNamespacesAndExcludedFilesFinder
+    {
+        public HashSet<string> AllowedNamespaces { get; } = new();
+        public HashSet<string> ExcludedFileNames { get; } = new();
+
+        public AllowedNamespacesAndExcludedFilesFinder(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                Console.WriteLine($"Config file '{filePath}' not found. Using defaults (all namespaces allowed, no excluded files).");
+                return;
+            }
+
+            var lines = File.ReadAllLines(filePath).Select(l => l.Trim()).Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith("#")).ToList();
+
+            bool readingAllowedNamespaces = false;
+            bool readingExcludedFileNames = false;
+
+            foreach (var line in lines)
+            {
+                if (line.Equals("ALLOWED_NAMESPACES:", StringComparison.OrdinalIgnoreCase))
+                {
+                    readingAllowedNamespaces = true;
+                    readingExcludedFileNames = false;
+                    continue;
+                }
+
+                if (line.Equals("EXCLUDED_FILENAMES:", StringComparison.OrdinalIgnoreCase))
+                {
+                    readingAllowedNamespaces = false;
+                    readingExcludedFileNames = true;
+                    continue;
+                }
+
+                if (readingAllowedNamespaces)
+                    AllowedNamespaces.Add(line);
+                else if (readingExcludedFileNames)
+                    ExcludedFileNames.Add(line);
+            }
+        }
+        public bool IsNamespaceAllowed(string ns)
+        {
+            return AllowedNamespaces.Count == 0 || AllowedNamespaces.Contains(ns);
+        }
+        public bool IsFileExcluded(string fileName)
+        {
+            return ExcludedFileNames.Contains(fileName);
+        }
+    }
 }
-
-
-//Invocation Expression 
-//Set   (SKIP SET FOR NOW)
-//SetFromToRotation
-//SetLookRotation
-//ToAngleAxis
-//ToString
-//Angle
-//AngleAxis
-//Dot
-//Euler
-//FromToRotation
-//Inverse
-//Lerp
-//LerpUnclamped
-//LookRotation HAS TWO THINGS NEED TO IMPLEMENT ANOTHER
-//Normalize
-//RotateTowards
-//Slerp
-//SlerpUnclamped
 
 
