@@ -3,14 +3,14 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35027.167
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vector3ToV3F3UtilsMigration", "MigrateToUnityMathematics\Vector3ToV3F3UtilsMigration.csproj", "{9ECA0508-934E-4EBB-944F-7BFDFCF1572A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vector3ToV3F3UtilsMigration", "Vector3ToV3F3UtilsMigration\Vector3ToV3F3UtilsMigration.csproj", "{9ECA0508-934E-4EBB-944F-7BFDFCF1572A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "V3F3UtilsToMathematicsMigration", "MigrateToUnityMathematicsP2\V3F3UtilsToMathematicsMigration.csproj", "{15D70CA9-951D-E441-3118-3B8C8D408BF6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "V3F3UtilsToMathematicsMigration", "V3F3UtilsToMathematicsMigration\V3F3UtilsToMathematicsMigration.csproj", "{15D70CA9-951D-E441-3118-3B8C8D408BF6}"
 	ProjectSection(ProjectDependencies) = postProject
 		{9ECA0508-934E-4EBB-944F-7BFDFCF1572A} = {9ECA0508-934E-4EBB-944F-7BFDFCF1572A}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuaternionToQMUtilsMigration", "MigrateToUnityMathematicsP3\QuaternionToQMUtilsMigration.csproj", "{A911B70B-2494-4EAB-B4C8-EADD0233731D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuaternionToQMUtilsMigration", "QuaternionToQMUtilsMigration\QuaternionToQMUtilsMigration.csproj", "{A911B70B-2494-4EAB-B4C8-EADD0233731D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QMUtilsToMathematicsMigration", "QMUtilsToMathematicsMigration\QMUtilsToMathematicsMigration.csproj", "{D5E8D2EC-00C4-4B58-BE25-49EC51E1EDC2}"
 EndProject

@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MigrateToUnityMathematics\Vector3ToV3F3UtilsMigration.csproj" />
+    <ProjectReference Include="..\Vector3ToV3F3UtilsMigration\Vector3ToV3F3UtilsMigration.csproj" />
   </ItemGroup>
 
   <ItemGroup>
