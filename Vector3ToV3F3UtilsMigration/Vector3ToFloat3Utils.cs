@@ -169,7 +169,7 @@ namespace UnityVector3Refactor
             {
                 return targ;
             }
-            return cur + (delta/dist) * maxDistanceDelta;
+            return cur + (delta / dist) * maxDistanceDelta;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

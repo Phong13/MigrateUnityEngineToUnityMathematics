@@ -637,10 +637,6 @@ namespace MigrateToUnityMathematics
 
             return base.VisitObjectCreationExpression(node);
         }
-        //TESTs FOR NORMALIZE
-        //TESTS FOR SETLookRotation
-        //Quaternion, public methods, wxyz
-        //math.up instead of new float(0,1,0)
 
         private InvocationExpressionSyntax CreateReplacementInvocation(string newName, ArgumentListSyntax arguments, SyntaxNode originalNode)
         {

@@ -540,6 +540,30 @@ public class TestQMUtils
         Assert.AreEqual(q1.z, q2.value.z, 1e-5f);
         Assert.AreEqual(q1.w, q2.value.w, 1e-5f);
     }
+    [Test]
+    public void SetLookRotationTest7()
+    {
+        var q1 = Quaternion.Euler(0f, 180f, 0f);
+        var q2 = quaternion.Euler(math.radians(0f), math.radians(180f), math.radians(0f));
+        QuaternionToMathematicsUtils.SetLookRotation(ref q1, Vector3.forward);
+        QuaternionToMathematicsUtils.SetLookRotation(ref q2, new float3(0, 0, 1));
+        Assert.AreEqual(q1.x, q2.value.x, 1e-5f);
+        Assert.AreEqual(q1.y, q2.value.y, 1e-5f);
+        Assert.AreEqual(q1.z, q2.value.z, 1e-5f);
+        Assert.AreEqual(q1.w, q2.value.w, 1e-5f);
+    }
+    [Test]
+    public void SetLookRotationTest8()
+    {
+        var q1 = Quaternion.Euler(1f, 1f, 0f);
+        var q2 = quaternion.Euler(math.radians(1f), math.radians(1f), math.radians(0f));
+        QuaternionToMathematicsUtils.SetLookRotation(ref q1, Vector3.forward);
+        QuaternionToMathematicsUtils.SetLookRotation(ref q2, new float3(0, 0, 1));
+        Assert.AreEqual(q1.x, q2.value.x, 1e-5f);
+        Assert.AreEqual(q1.y, q2.value.y, 1e-5f);
+        Assert.AreEqual(q1.z, q2.value.z, 1e-5f);
+        Assert.AreEqual(q1.w, q2.value.w, 1e-5f);
+    }
     //-----------------------------------------------
     [Test]
     public void ToAngleAxisTest1()
@@ -1161,6 +1185,50 @@ public class TestQMUtils
         Assert.AreEqual(q1.y, q2.value.y, 1e-5f);
         Assert.AreEqual(q1.z, q2.value.z, 1e-5f);
         Assert.AreEqual(q1.w, q2.value.w, 1e-5f);
+    }
+    [Test]
+    public void NormalizeTest6()
+    {
+        var q1 = new Quaternion(-5f, 2f, -3f, 1f);
+        var q1Copy = new Quaternion(-5f, 2f, -3f, 1f);
+        var q2 = new quaternion(-5f, 2f, -3f, 1f);
+        var q2Copy = new quaternion(-5f, 2f, -3f, 1f);
+        var q3 = QuaternionToMathematicsUtils.Normalize(q1);
+        var q4 = QuaternionToMathematicsUtils.Normalize(q2);
+        Assert.AreEqual(q1.x, q1Copy.x, 1e-5f);
+        Assert.AreEqual(q1.y, q1Copy.y, 1e-5f);
+        Assert.AreEqual(q1.z, q1Copy.z, 1e-5f);
+        Assert.AreEqual(q1.w, q1Copy.w, 1e-5f);
+        Assert.AreEqual(q2.value.x, q2Copy.value.x, 1e-5f);
+        Assert.AreEqual(q2.value.y, q2Copy.value.y, 1e-5f);
+        Assert.AreEqual(q2.value.z, q2Copy.value.z, 1e-5f);
+        Assert.AreEqual(q2.value.w, q2Copy.value.w, 1e-5f);
+        Assert.AreEqual(q3.x, q4.value.x, 1e-5f);
+        Assert.AreEqual(q3.y, q4.value.y, 1e-5f);
+        Assert.AreEqual(q3.z, q4.value.z, 1e-5f);
+        Assert.AreEqual(q3.w, q4.value.w, 1e-5f);
+    }
+    [Test]
+    public void NormalizeTest7()
+    {
+        var q1 = new Quaternion(0f, 2f, -1f, 1.555f);
+        var q1Copy = new Quaternion(0f, 2f, -1f, 1.555f);
+        var q2 = new quaternion(0f, 2f, -1f, 1.555f);
+        var q2Copy = new quaternion(0f, 2f, -1f, 1.555f);
+        var q3 = QuaternionToMathematicsUtils.Normalize(q1);
+        var q4 = QuaternionToMathematicsUtils.Normalize(q2);
+        Assert.AreEqual(q1.x, q1Copy.x, 1e-5f);
+        Assert.AreEqual(q1.y, q1Copy.y, 1e-5f);
+        Assert.AreEqual(q1.z, q1Copy.z, 1e-5f);
+        Assert.AreEqual(q1.w, q1Copy.w, 1e-5f);
+        Assert.AreEqual(q2.value.x, q2Copy.value.x, 1e-5f);
+        Assert.AreEqual(q2.value.y, q2Copy.value.y, 1e-5f);
+        Assert.AreEqual(q2.value.z, q2Copy.value.z, 1e-5f);
+        Assert.AreEqual(q2.value.w, q2Copy.value.w, 1e-5f);
+        Assert.AreEqual(q3.x, q4.value.x, 1e-5f);
+        Assert.AreEqual(q3.y, q4.value.y, 1e-5f);
+        Assert.AreEqual(q3.z, q4.value.z, 1e-5f);
+        Assert.AreEqual(q3.w, q4.value.w, 1e-5f);
     }
     //-----------------------------------------------
     [Test]

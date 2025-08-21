@@ -111,6 +111,14 @@ public static class QuaternionToMathematicsUtils
     {
         q = quaternion.LookRotation(math.normalize(view), math.normalize(up));
     }
+    public static void SetLookRotation(ref Quaternion q, Vector3 view)
+    {
+        q = UnityEngine.Quaternion.LookRotation(view);
+    }
+    public static void SetLookRotation(ref quaternion q, float3 view)
+    {
+        q = quaternion.LookRotation(math.normalize(view), new float3(0, 1, 0));
+    }
 
     public static void ToAngleAxis_deg(ref Quaternion q, out float angle, out Vector3 axis)
     {
