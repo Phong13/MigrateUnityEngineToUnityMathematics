@@ -21,11 +21,11 @@ namespace UnityVector3Refactor
 
             if (args.Length == 0)
             {
-                Console.WriteLine("Usage: Vector3ToFloat3MigrationP1 <path_to_unity_project_or_solution_file> [optional: <path_to_config_file>]");
-                Console.WriteLine("Example with config file: dotnet run --project Vector3ToFloat3MigrationP1.csproj " +
+                Console.WriteLine("Usage: Vector3ToV3F3UtilsMigration <path_to_unity_project_or_solution_file> [optional: <path_to_config_file>]");
+                Console.WriteLine("Example with config file: dotnet run --project Vector3ToV3F3UtilsMigration.csproj " +
                                   "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" " +
-                                  "\"C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\MigrateToUnityMathematics\\config.txt\"");
-                Console.WriteLine("dotnet run --project Vector3ToFloat3MigrationP1.csproj " +
+                                  "\"C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\Vector3ToV3F3UtilsMigration\\config.txt\"");
+                Console.WriteLine("dotnet run --project Vector3ToV3F3UtilsMigration.csproj " +
                                   "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" ");
                 return;
             }
