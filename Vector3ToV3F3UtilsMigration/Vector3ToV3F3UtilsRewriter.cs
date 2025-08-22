@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Threading.Tasks;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
@@ -183,6 +184,9 @@ namespace MigrateToUnityMathematics
                     if (newSyntaxRoot != originalSyntaxTree.GetRoot())
                     {
                         totalReplacements += Vector3ToV3F3UtilsRewriter.ReplacementsCount;
+
+                        newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
+
                         solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
                         Console.WriteLine($"    Replaced {Vector3ToV3F3UtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
                     }
@@ -199,6 +203,40 @@ namespace MigrateToUnityMathematics
             {
                 Console.WriteLine("Failed to apply changes to disk.");
             }
+        }
+
+        private static CompilationUnitSyntax AddRequiredNamespaces(CompilationUnitSyntax root)
+        {
+            string rewriterNamespace = typeof(Vector3ToV3F3UtilsRewriter).Namespace;
+
+            var requiredUsings = new List<string> { "Unity.Mathematics" };
+            if (!string.IsNullOrEmpty(rewriterNamespace))
+                requiredUsings.Add(rewriterNamespace);
+
+
+            var existingUsings = new HashSet<string>();
+            foreach (var u in root.Usings)
+            {
+                existingUsings.Add(u.Name.ToString());
+            }
+
+            var newUsings = new List<UsingDirectiveSyntax>();
+            foreach (var u in requiredUsings)
+            {
+                if (!existingUsings.Contains(u))
+                {
+                    var usingDirective = SyntaxFactory
+                        .UsingDirective(
+                            SyntaxFactory.IdentifierName(u)
+                                         .WithLeadingTrivia(SyntaxFactory.Space)
+                        )
+                        .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed);
+
+                    newUsings.Add(usingDirective);
+                }
+            }
+
+            return root.AddUsings(newUsings.ToArray());
         }
     }
 

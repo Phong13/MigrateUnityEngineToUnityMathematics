@@ -185,6 +185,9 @@ namespace MigrateToUnityMathematics
                     if (newSyntaxRoot != originalSyntaxTree.GetRoot())
                     {
                         totalReplacements += QMUtilsToUnityMathematicsRewriter.ReplacementsCount;
+
+                        newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
+
                         solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
                         Console.WriteLine($"    Replaced {QMUtilsToUnityMathematicsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
                     }
@@ -201,6 +204,40 @@ namespace MigrateToUnityMathematics
             {
                 Console.WriteLine("Failed to apply changes to disk.");
             }
+        }
+
+        private static CompilationUnitSyntax AddRequiredNamespaces(CompilationUnitSyntax root)
+        {
+            string rewriterNamespace = typeof(QMUtilsToUnityMathematicsRewriter).Namespace;
+
+            var requiredUsings = new List<string> { "Unity.Mathematics" };
+            if (!string.IsNullOrEmpty(rewriterNamespace))
+                requiredUsings.Add(rewriterNamespace);
+
+
+            var existingUsings = new HashSet<string>();
+            foreach (var u in root.Usings)
+            {
+                existingUsings.Add(u.Name.ToString());
+            }
+
+            var newUsings = new List<UsingDirectiveSyntax>();
+            foreach (var u in requiredUsings)
+            {
+                if (!existingUsings.Contains(u))
+                {
+                    var usingDirective = SyntaxFactory
+                        .UsingDirective(
+                            SyntaxFactory.IdentifierName(u)
+                                         .WithLeadingTrivia(SyntaxFactory.Space)
+                        )
+                        .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed);
+
+                    newUsings.Add(usingDirective);
+                }
+            }
+
+            return root.AddUsings(newUsings.ToArray());
         }
     }
     /// <summary>
