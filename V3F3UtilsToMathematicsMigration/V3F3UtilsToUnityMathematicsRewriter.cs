@@ -225,6 +225,7 @@ namespace MigrateToUnityMathematics
             {
                 if (!existingUsings.Contains(u))
                 {
+                    Console.WriteLine($"    Adding using: {u}");
                     var usingDirective = SyntaxFactory
                         .UsingDirective(
                             SyntaxFactory.IdentifierName(u)
