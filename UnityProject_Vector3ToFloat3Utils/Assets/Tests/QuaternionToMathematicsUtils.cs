@@ -149,7 +149,7 @@ public static class QuaternionToMathematicsUtils
     }
     public static string ToString(quaternion q)
     {
-        return $"({q.value.x:F5}, {q.value.y:F5}, {q.value.z:F5}, {q.value.w:F5})";
+        return q.ToString(); // Prints slightly different that Quaternion.ToString
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

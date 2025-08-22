@@ -71,6 +71,14 @@ public static class Vector3ToFloat3Utils
         return v1.x != v2.x || v1.y != v2.y || v1.z != v2.z;
     }
 
+    public static string ToString(Vector3 v)
+    {
+        return v.ToString();
+    }
+    public static string ToString(float3 v)
+    {
+        return v.ToString();
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float Angle_deg(Vector3 v1, Vector3 v2)

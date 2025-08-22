@@ -266,6 +266,14 @@ public class TestVector3ToFloat3Utils
     }
     //-----------------------------------------------
     [Test]
+    public void ToStringTest() //Failing because of extra decimal places
+    {
+        string sV = Vector3ToFloat3Utils.ToString(new Vector3(1f, -2.5f, 0.125f));
+        string sF = Vector3ToFloat3Utils.ToString(new float3(1f, -2.5f, 0.125f));
+        Assert.AreEqual(sV, sF);
+    }
+    //-----------------------------------------------
+    [Test]
     public void Angle_degTest()
     {
         Vector3 v1 = Vector3.right;
