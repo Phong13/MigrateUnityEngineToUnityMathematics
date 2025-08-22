@@ -236,50 +236,43 @@ namespace MigrateToUnityMathematics
             return newNode;
         }
 
+        //Maybe test Angle_deg, Euler_deg, and definitely Lerp
         public override SyntaxNode VisitInvocationExpression(InvocationExpressionSyntax node)
         {
+            var originalSymbol = _semanticModel.GetSymbolInfo(node.Expression).Symbol as IMethodSymbol;
+
             var newNode = (InvocationExpressionSyntax)base.VisitInvocationExpression(node);
 
-            var symbolInfo = _semanticModel.GetSymbolInfo(newNode.Expression);
-            var methodSymbol = symbolInfo.Symbol as IMethodSymbol;
-
-            if (methodSymbol?.ContainingType?.Name == "QuaternionToMathematicsUtils")
+            if (originalSymbol?.ContainingType?.Name == "QuaternionToMathematicsUtils")
             {
-                // ADD EQUALS AND MULTIPLY
-                // ADD PARAMATER LENGTH AND TYPE CHECKS
-                if (methodSymbol.Name == "eulerAngles_deg")
+                if (originalSymbol.Name == "eulerAngles_deg" &&
+                    newNode.ArgumentList.Arguments.Count == 1)
                 {
                     ReplacementsCount++;
                     return SyntaxFactory.ParseExpression(
                         $"math.degrees(math.Euler(math.normalize({newNode.ArgumentList.Arguments[0]}), math.RotationOrder.ZXY))"
                     ).WithTriviaFrom(newNode);
                 }
-                if (methodSymbol.Name == "ToAngleAxis_deg")
-                {
-                    /*
-                    ReplacementsCount++;
-                    return SyntaxFactory.ParseExpression(
-                        $"quaternion.ToAngleAxis({newNode.ArgumentList.Arguments[0]})"
-                    ).WithTriviaFrom(newNode);
-                    */
-                    // Complicated
-                }
-                if (methodSymbol.Name == "Angle_deg")
+                if (originalSymbol.Name == "Angle_deg" &&
+                    newNode.ArgumentList.Arguments.Count == 2)
                 {
                     ReplacementsCount++;
                     return SyntaxFactory.ParseExpression(
-                        $"math.degrees(2f * math.acos(math.clamp(math.dot(math.normalize({newNode.ArgumentList.Arguments[0]}), math.normalize({newNode.ArgumentList.Arguments[1]})), -1f, 1f)))"
+                        $"math.degrees(2f * math.acos(math.clamp(math.abs(math.dot(math.normalize({newNode.ArgumentList.Arguments[0]}), math.normalize({newNode.ArgumentList.Arguments[1]}))), -1f, 1f)))"
                     ).WithTriviaFrom(newNode);
-                    // This logic is no longer taking shortest path (if (dot < 0f) dot = -dot), might not work
+                    // I think this works... might be too long?
+                    // Had to replace shortest path correction in wrapper: if (dot < 0f) dot = -dot)
+                    // with math.abs()
                 }
-                if (methodSymbol.Name == "AngleAxis_deg")
+                if (originalSymbol.Name == "AngleAxis_deg" &&
+                    newNode.ArgumentList.Arguments.Count == 2)
                 {
                     ReplacementsCount++;
                     return SyntaxFactory.ParseExpression(
                         $"quaternion.AxisAngle(math.normalize({newNode.ArgumentList.Arguments[1]}), math.radians({newNode.ArgumentList.Arguments[0]}))"
                     ).WithTriviaFrom(newNode);
                 }
-                if (methodSymbol.Name == "Euler_deg")
+                if (originalSymbol.Name == "Euler_deg")
                 {
                     ReplacementsCount++;
                     if (newNode.ArgumentList.Arguments.Count == 3)
@@ -288,38 +281,33 @@ namespace MigrateToUnityMathematics
                             $"quaternion.Euler(math.radians({newNode.ArgumentList.Arguments[0]}), math.radians({newNode.ArgumentList.Arguments[1]}), math.radians({newNode.ArgumentList.Arguments[2]}))"
                         ).WithTriviaFrom(newNode);
                     }
-                    else
+                    else if (newNode.ArgumentList.Arguments.Count == 1)
                     {
                         return SyntaxFactory.ParseExpression(
                             $"quaternion.Euler(math.radians({newNode.ArgumentList.Arguments[0]}.x), math.radians({newNode.ArgumentList.Arguments[0]}.y), math.radians({newNode.ArgumentList.Arguments[0]}.z))"
                         ).WithTriviaFrom(newNode);
                     }
                 }
-                if (methodSymbol.Name == "FromToRotation")
-                {
-                    /*
-                    ReplacementsCount++;
-                    return SyntaxFactory.ParseExpression(
-                        $"quaternion.FromToRotation({newNode.ArgumentList.Arguments[0]}, {newNode.ArgumentList.Arguments[1]})"
-                    ).WithTriviaFrom(newNode);
-                    */
-                    // Complicated
-                }
-                if (methodSymbol.Name == "Inverse")
+                if (originalSymbol.Name == "Inverse" &&
+                    newNode.ArgumentList.Arguments.Count == 1)
                 {
                     ReplacementsCount++;
                     return SyntaxFactory.ParseExpression(
                         $"math.inverse({newNode.ArgumentList.Arguments[0]})"
                     ).WithTriviaFrom(newNode);
                 }
-                if (methodSymbol.Name == "Lerp")
+                // Should work, too complicated?
+                /*
+                if (originalSymbol.Name == "Lerp" &&
+                    newNode.ArgumentList.Arguments.Count == 3)
                 {
                     ReplacementsCount++;
                     return SyntaxFactory.ParseExpression(
                         $"math.normalize(new quaternion(math.lerp({newNode.ArgumentList.Arguments[0]}.value, {newNode.ArgumentList.Arguments[1]}.value, math.clamp({newNode.ArgumentList.Arguments[2]}, 0f, 1f))))"
                     ).WithTriviaFrom(newNode);
                 }
-                if (methodSymbol.Name == "LookRotation")
+                */
+                if (originalSymbol.Name == "LookRotation")
                 {
                     ReplacementsCount++;
                     if (newNode.ArgumentList.Arguments.Count == 1)
@@ -328,59 +316,82 @@ namespace MigrateToUnityMathematics
                             $"quaternion.LookRotation(math.normalize({newNode.ArgumentList.Arguments[0]}), new float3(0, 1, 0))"
                         ).WithTriviaFrom(newNode);
                     }
-                    else
+                    else if (newNode.ArgumentList.Arguments.Count == 2)
                     {
                         return SyntaxFactory.ParseExpression(
-                            $"quaternion.LookRotationSafe(math.normalize({newNode.ArgumentList.Arguments[0]}), math.normalize({newNode.ArgumentList.Arguments[1]}))"
+                            $"quaternion.LookRotation(math.normalize({newNode.ArgumentList.Arguments[0]}), math.normalize({newNode.ArgumentList.Arguments[1]}))"
                         ).WithTriviaFrom(newNode);
                     }
                 }
-                if (methodSymbol.Name == "Normalize")
+                if (originalSymbol.Name == "Normalize" &&
+                    newNode.ArgumentList.Arguments.Count == 1 &&
+                    newNode.ArgumentList.Arguments[0].RefOrOutKeyword.Kind() != SyntaxKind.RefKeyword)
                 {
-                    /*
-                    ReplacementsCount++;
-                    // Check if it's the ref overload
-                    if (newNode.ArgumentList.Arguments.Count == 1 &&
-                        newNode.ArgumentList.Arguments[0].RefOrOutKeyword.Kind() == SyntaxKind.RefKeyword)
-                    {
-                        // ref version: "QuaternionToMathematicsUtils.Normalize(ref q)" 
-                        // becomes: "q = math.normalize(q);"
-                        var arg = newNode.ArgumentList.Arguments[0].Expression;
-                        return SyntaxFactory.ParseStatement(
-                            $"{arg}. = math.normalize({arg});"
-                        ).WithTriviaFrom(newNode);
-                    }
-                    else
-                    {
-                        // non-ref version: "QuaternionToMathematicsUtils.Normalize(q)"
-                        // becomes: "math.normalize(q)"
-                        var arg = newNode.ArgumentList.Arguments[0].Expression;
-                        return SyntaxFactory.ParseExpression(
-                            $"math.normalize({arg})"
-                        ).WithTriviaFrom(newNode);
-                    }
-                    */
-                }
-                if (methodSymbol.Name == "RotateTowards")
-                {
-                    /*
                     ReplacementsCount++;
                     return SyntaxFactory.ParseExpression(
-                        $""
+                        $"math.normalize({newNode.ArgumentList.Arguments[0].Expression})"
                     ).WithTriviaFrom(newNode);
-                    */
-                    // Complicated
                 }
-                if (methodSymbol.Name == "Slerp")
+                // Should work, too complicated?
+                /*
+                if (originalSymbol.Name == "Slerp" &&
+                    newNode.ArgumentList.Arguments.Count == 3)
                 {
                     ReplacementsCount++;
                     return SyntaxFactory.ParseExpression(
                         $"math.slerp({newNode.ArgumentList.Arguments[0]}, {newNode.ArgumentList.Arguments[1]}, math.clamp({newNode.ArgumentList.Arguments[2]}, 0f, 1f))"
                     ).WithTriviaFrom(newNode);
                 }
+                */
+                // Should work, too complicated?
+                /*
+                if (originalSymbol.Name == "Equals" &&
+                    newNode.ArgumentList.Arguments.Count == 2)
+                {
+                    ReplacementsCount++;
+                    return SyntaxFactory.ParseExpression(
+                        $"{newNode.ArgumentList.Arguments[0]}.value.x == {newNode.ArgumentList.Arguments[1]}.value.x && " +
+                        $"{newNode.ArgumentList.Arguments[0]}.value.y == {newNode.ArgumentList.Arguments[1]}.value.y && " +
+                        $"{newNode.ArgumentList.Arguments[0]}.value.z == {newNode.ArgumentList.Arguments[1]}.value.z && " +
+                        $"{newNode.ArgumentList.Arguments[0]}.value.w == {newNode.ArgumentList.Arguments[1]}.value.w"
+                    ).WithTriviaFrom(newNode);
+                }
+                */
+                if (originalSymbol.Name == "Multiply" &&
+                    newNode.ArgumentList.Arguments.Count == 2)
+                {
+                    ReplacementsCount++;
+                    return SyntaxFactory.ParseExpression(
+                        $"math.mul({newNode.ArgumentList.Arguments[0]}, {newNode.ArgumentList.Arguments[1]})"
+                    ).WithTriviaFrom(newNode);
+                }
             }
 
             return newNode;
+        }
+
+        public override SyntaxNode VisitExpressionStatement(ExpressionStatementSyntax node)
+        {
+            if (node.Expression is InvocationExpressionSyntax invocation)
+            {
+                var symbol = _semanticModel.GetSymbolInfo(invocation.Expression).Symbol as IMethodSymbol;
+
+                if (symbol?.ContainingType?.Name == "QuaternionToMathematicsUtils" &&
+                    symbol.Name == "Normalize" &&
+                    invocation.ArgumentList.Arguments.Count == 1 &&
+                    invocation.ArgumentList.Arguments[0].RefOrOutKeyword.Kind() == SyntaxKind.RefKeyword)
+                {
+                    var arg = invocation.ArgumentList.Arguments[0].Expression;
+                    ReplacementsCount++;
+
+                    // Replace "Utils.Normalize(ref q);" with "q = math.normalize(q);"
+                    return SyntaxFactory.ParseStatement(
+                        $"{arg} = math.normalize({arg});"
+                    ).WithTriviaFrom(node);
+                }
+            }
+
+            return base.VisitExpressionStatement(node);
         }
     }
 

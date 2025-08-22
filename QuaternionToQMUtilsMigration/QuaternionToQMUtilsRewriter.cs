@@ -323,6 +323,7 @@ namespace MigrateToUnityMathematics
                         .WithTrailingTrivia(newNode.GetTrailingTrivia());
                 }
             }
+            /*
             else if (originalSymbol is IFieldSymbol fieldSymbol &&
                      fieldSymbol.ContainingType?.ToDisplayString() == "UnityEngine.Quaternion")
             {
@@ -349,7 +350,7 @@ namespace MigrateToUnityMathematics
                         .WithTrailingTrivia(newNode.GetTrailingTrivia());
                 }
             }
-
+            */
             return newNode;
         }
 
