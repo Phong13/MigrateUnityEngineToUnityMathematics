@@ -9,7 +9,7 @@ using UnityEngine;
 using Unity.Mathematics;
 using System.Net.Security;
 
-namespace UnityVector3Refactor
+namespace MigrateToUnityMathematics
 {
     public static class QuaternionToMathematicsUtils
     {

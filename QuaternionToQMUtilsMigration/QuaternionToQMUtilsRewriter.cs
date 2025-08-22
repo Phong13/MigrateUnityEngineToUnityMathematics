@@ -8,7 +8,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
-using UnityVector3Refactor;
 
 namespace MigrateToUnityMathematics
 {
@@ -194,7 +193,7 @@ namespace MigrateToUnityMathematics
             if (workspace.TryApplyChanges(solution))
             {
                 Console.WriteLine($"Successfully applied all changes. Total replacements: {totalReplacements}");
-                Console.WriteLine("Remember to add the QuaternionToQMUtils.cs file to your Unity project if you haven't already.");
+                Console.WriteLine("Remember to add the QuaternionToMathematicsUtils.cs file to your Unity project if you haven't already.");
             }
             else
             {

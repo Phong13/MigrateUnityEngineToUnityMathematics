@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
 
-namespace UnityVector3Refactor
+namespace MigrateToUnityMathematics
 {
     class Vector3ToV3F3UtilsRewriter
     {

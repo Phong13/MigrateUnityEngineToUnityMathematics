@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace UnityVector3Refactor
+namespace MigrateToUnityMathematics
 {
     public static class Vector3ToFloat3Utils
     {
