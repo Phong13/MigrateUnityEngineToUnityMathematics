@@ -8,7 +8,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
-using UnityVector3Refactor;
 
 namespace MigrateToUnityMathematics
 {
@@ -24,7 +23,7 @@ namespace MigrateToUnityMathematics
                 Console.WriteLine("Usage: QuaternionToQMUtilsMigration <path_to_unity_project_or_solution_file> [optional: <path_to_config_file>]");
                 Console.WriteLine("Example with config file: dotnet run --project QuaternionToQMUtilsMigration.csproj " +
                                   "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" " +
-                                  "\"C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\QuaternionToQMUtilsMigration\\config.txt\"");
+                                  "C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\config.txt\"");
                 Console.WriteLine("dotnet run --project QuaternionToQMUtilsMigration.csproj " +
                                   "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" ");
 
@@ -148,7 +147,8 @@ namespace MigrateToUnityMathematics
                 {
                     if (document.SourceCodeKind != SourceCodeKind.Regular ||
                         !document.FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
-                        document.Name.Contains("QuaternionToQMUtils"))
+                        document.Name.Contains("Vector3ToFloat3Utils") ||
+                        document.Name.Contains("QuaternionToMathematicsUtils"))
                     {
                         continue;
                     }
@@ -193,7 +193,7 @@ namespace MigrateToUnityMathematics
             if (workspace.TryApplyChanges(solution))
             {
                 Console.WriteLine($"Successfully applied all changes. Total replacements: {totalReplacements}");
-                Console.WriteLine("Remember to add the QuaternionToQMUtils.cs file to your Unity project if you haven't already.");
+                Console.WriteLine("Remember to add the QuaternionToMathematicsUtils.cs file to your Unity project if you haven't already.");
             }
             else
             {
@@ -323,6 +323,7 @@ namespace MigrateToUnityMathematics
                         .WithTrailingTrivia(newNode.GetTrailingTrivia());
                 }
             }
+            /*
             else if (originalSymbol is IFieldSymbol fieldSymbol &&
                      fieldSymbol.ContainingType?.ToDisplayString() == "UnityEngine.Quaternion")
             {
@@ -349,7 +350,7 @@ namespace MigrateToUnityMathematics
                         .WithTrailingTrivia(newNode.GetTrailingTrivia());
                 }
             }
-
+            */
             return newNode;
         }
 
