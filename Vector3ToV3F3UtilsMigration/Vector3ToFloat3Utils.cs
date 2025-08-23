@@ -87,6 +87,14 @@ namespace MigrateToUnityMathematics
             float dotProduct = math.dot(v1Normalized, v2Normalized);
             return math.degrees(math.acos(math.clamp(dotProduct, -1f, 1f)));
         }
+        public static string ToString(Vector3 v)
+        {
+            return v.ToString();
+        }
+        public static string ToString(float3 v)
+        {
+            return v.ToString();
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3 Cross(Vector3 v1, Vector3 v2)
