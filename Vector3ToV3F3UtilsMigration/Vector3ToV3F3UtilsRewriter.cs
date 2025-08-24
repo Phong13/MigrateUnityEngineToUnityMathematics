@@ -24,10 +24,10 @@ namespace MigrateToUnityMathematics
             {
                 Console.WriteLine("Usage: Vector3ToV3F3UtilsMigration <path_to_unity_project_or_solution_file> [optional: <path_to_config_file>]");
                 Console.WriteLine("Example with config file: dotnet run --project Vector3ToV3F3UtilsMigration.csproj " +
-                                  "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" " +
+                                  "--config \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" " +
                                   "C:\\Users\\rowan\\Workspace\\Unity\\MigrateUnityEngineToUnityMathematics\\config.txt\"");
                 Console.WriteLine("dotnet run --project Vector3ToV3F3UtilsMigration.csproj " +
-                                  "-- \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" ");
+                                  "--config \"C:\\Users\\rowan\\Workspace\\Unity\\Vector3ToFloat3UtilsTesting\\Assembly-CSharp.csproj\" ");
                 return;
             }
 
@@ -60,10 +60,20 @@ namespace MigrateToUnityMathematics
             }
             Console.WriteLine($"Processing: {fullPath}");
 
+            string configPath = null;
             AllowedNamespacesAndExcludedFilesFinder config;
-            if (args.Length > 1)
+
+            for (int i = 0; i < args.Length; i++)
             {
-                string configPath = Path.GetFullPath(args[1]);
+                if (args[i] == "--config" && i + 1 < args.Length)
+                {
+                    configPath = args[i + 1];
+                    i++; // skip over the path we just consumed
+                }
+            }
+
+            if (configPath != null)
+            {
                 config = new AllowedNamespacesAndExcludedFilesFinder(configPath);
 
                 Console.WriteLine("Excluded File Names:");
@@ -383,10 +393,10 @@ namespace MigrateToUnityMathematics
                 {
                     string memberAccessName = memberAccess.Name.Identifier.Text;
 
-                    if(originalSymbol is IMethodSymbol methodSymbol &&
+                    if (originalSymbol is IMethodSymbol methodSymbol &&
                        methodSymbol.ContainingType != null &&
-                       methodSymbol.ContainingType.ToDisplayString() == "UnityEngine.Vector3") 
-                    { 
+                       methodSymbol.ContainingType.ToDisplayString() == "UnityEngine.Vector3")
+                    {
                         if (methodSymbol.Parameters.Length == 2 &&
                             methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
                             methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" &&
@@ -468,7 +478,7 @@ namespace MigrateToUnityMathematics
                                 .WithLeadingTrivia(newNode.GetLeadingTrivia())
                                 .WithTrailingTrivia(newNode.GetTrailingTrivia());
                         }
-                        if (methodSymbol.ContainingType.ToString() == "UnityEngine.Vector3" && 
+                        if (methodSymbol.ContainingType.ToString() == "UnityEngine.Vector3" &&
                             methodSymbol.Parameters.Length == 0 &&
                             !methodSymbol.IsStatic &&
                             originalName == "Normalize")
@@ -495,6 +505,37 @@ namespace MigrateToUnityMathematics
                                 .WithLeadingTrivia(newNode.GetLeadingTrivia())
                                 .WithTrailingTrivia(newNode.GetTrailingTrivia());
                         }
+
+                        //========
+                        originalSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
+
+                        // var newNode = (InvocationExpressionSyntax)base.VisitInvocationExpression(node);
+
+                        if (originalSymbol is IMethodSymbol methodSymboll &&
+                            methodSymboll.ContainingType != null &&
+                            methodSymboll.ContainingType.ToDisplayString() == "UnityEngine.Vector3" &&
+                            methodSymboll.Name == "ToString")
+                        {
+                            if (methodSymbol.Parameters.Length == 1 &&
+                                    methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
+                            {
+                                ReplacementsCount++;
+
+                                Console.WriteLine("Found a 'ToString' with format arg. removing it.");
+
+                                // The .Expression part is `myVec.ToString`
+                                var noArgInvocation = SyntaxFactory.InvocationExpression(
+                                    newNode.Expression,
+                                    SyntaxFactory.ArgumentList() // empty arg list
+                                );
+
+                                return noArgInvocation
+                                    .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                                    .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                            }
+
+                        }
+                        //========
                     }
                 }
 
