@@ -5,11 +5,13 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
+using UnityEngine;
 
 namespace MigrateToUnityMathematics
 {
@@ -88,13 +90,19 @@ namespace MigrateToUnityMathematics
                 config = new AllowedNamespacesAndExcludedFilesFinder(null);
             }
 
+            bool result = await FirstPass(fullPath, config);
+        }
+
+        //===============
+        static async Task<bool> FirstPass(string fullPath, AllowedNamespacesAndExcludedFilesFinder config)
+        {
             var workspace = MSBuildWorkspace.Create();
 
             // Optional: Handle MSBuild warnings/errors
             workspace.WorkspaceFailed += (sender, e) =>
-            {
-                Console.WriteLine($"MSBuild Error: {e.Diagnostic.Message}");
-            };
+                    {
+                        Console.WriteLine($"MSBuild Error: {e.Diagnostic.Message}");
+                    };
 
             Solution solution = null;
             if (File.Exists(fullPath) && (fullPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) || fullPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)))
@@ -127,19 +135,19 @@ namespace MigrateToUnityMathematics
                 else
                 {
                     Console.WriteLine("No .csproj files found in the specified directory. Please provide a solution or project file, or a directory containing .csproj files.");
-                    return;
+                    return false;
                 }
             }
             else
             {
                 Console.WriteLine("Invalid target path. Please provide a path to a .sln, .csproj, or a directory.");
-                return;
+                return false;
             }
 
             if (solution == null)
             {
                 Console.WriteLine("Failed to load solution/project.");
-                return;
+                return false;
             }
 
             Console.WriteLine($"Solution loaded. Contains {solution.Projects.Count()} project(s).");
@@ -190,7 +198,6 @@ namespace MigrateToUnityMathematics
 
                     var Vector3ToV3F3UtilsRewriter = new Vector3ToV3F3UtilsTransformer(originalSemanticModel);
                     var newSyntaxRoot = Vector3ToV3F3UtilsRewriter.Visit(originalSyntaxTree.GetRoot());
-
                     if (newSyntaxRoot != originalSyntaxTree.GetRoot())
                     {
                         totalReplacements += Vector3ToV3F3UtilsRewriter.ReplacementsCount;
@@ -208,12 +215,15 @@ namespace MigrateToUnityMathematics
             {
                 Console.WriteLine($"Successfully applied all changes. Total replacements: {totalReplacements}");
                 Console.WriteLine("Remember to add the Vector3ToFloat3Utils.cs file to your Unity project if you haven't already.");
+                return true;
             }
             else
             {
                 Console.WriteLine("Failed to apply changes to disk.");
+                return false;
             }
         }
+ 
 
         private static CompilationUnitSyntax AddRequiredNamespaces(CompilationUnitSyntax root)
         {
@@ -272,6 +282,57 @@ namespace MigrateToUnityMathematics
             var newNode = (MemberAccessExpressionSyntax)base.VisitMemberAccessExpression(node);
 
             string memberName = newNode.Name.Identifier.Text;
+
+            //===========
+            if (originalSymbol is IPropertySymbol propSymboll &&
+                propSymboll.ContainingType != null &&
+                (
+                    (propSymboll.ContainingType.ToDisplayString() == "UnityEngine.Transform" &&
+                        (
+                             propSymboll.Name == "position" ||
+                             propSymboll.Name == "localPostion" ||
+                             propSymboll.Name == "localScale" ||
+                             propSymboll.Name == "lossyScale" ||
+                             propSymboll.Name == "forward" ||
+                             propSymboll.Name == "up" ||
+                             propSymboll.Name == "right"
+                         )
+                    ) ||
+                    (propSymboll.ContainingType.ToDisplayString() == "UnityEngine.Rigidbody" &&
+                        (
+                             propSymboll.Name == "position" ||
+                             propSymboll.Name == "angularVelocity" ||
+                             propSymboll.Name == "linearVelocity" ||
+                             propSymboll.Name == "centerOfMass" ||
+                             propSymboll.Name == "inertiaTensor"
+                         )
+                    )
+                )
+                )
+            {
+                // Is this access being used as an r-value (getter) or l-value (setter)?
+                // If parent is an AssignmentExpression and this node is on the left-hand side -> it's a setter.
+                var parent = node.Parent;
+
+                bool isSetter = parent is AssignmentExpressionSyntax assignment &&
+                                assignment.Left.Contains(node);
+
+                if (!isSetter)
+                {
+                    ReplacementsCount++;
+
+                    // Wrap in cast to float3
+                    var castExpr = SyntaxFactory.CastExpression(
+                        SyntaxFactory.ParseTypeName("float3"),
+                        newNode.WithoutTrivia()
+                    );
+
+                    return castExpr
+                        .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                        .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                }
+            }
+            //==========
 
             if (originalSymbol is IPropertySymbol propSymbol &&
             propSymbol.ContainingType != null &&
@@ -521,8 +582,6 @@ namespace MigrateToUnityMathematics
                             {
                                 ReplacementsCount++;
 
-                                Console.WriteLine("Found a 'ToString' with format arg. removing it.");
-
                                 // The .Expression part is `myVec.ToString`
                                 var noArgInvocation = SyntaxFactory.InvocationExpression(
                                     newNode.Expression,
@@ -544,6 +603,36 @@ namespace MigrateToUnityMathematics
 
             return base.VisitInvocationExpression(node);
         }
+
+        /*
+        public override SyntaxNode VisitParameter(ParameterSyntax node)
+        {
+            var typeInfo = _semanticModel.GetTypeInfo(node.Type).Type;
+
+            if (typeInfo?.ToDisplayString() == "UnityEngine.Vector3")
+            {
+                ReplacementsCount++;
+                return node.WithType(SyntaxFactory.ParseTypeName("float3")
+                    .WithTriviaFrom(node.Type));
+            }
+
+            return base.VisitParameter(node);
+        }
+
+        public override SyntaxNode VisitVariableDeclaration(VariableDeclarationSyntax node)
+        {
+            var typeInfo = _semanticModel.GetTypeInfo(node.Type).Type;
+
+            if (typeInfo?.ToDisplayString() == "UnityEngine.Vector3")
+            {
+                ReplacementsCount++;
+                return node.WithType(SyntaxFactory.ParseTypeName("float3")
+                    .WithTriviaFrom(node.Type));
+            }
+
+            return base.VisitVariableDeclaration(node);
+        }
+        */
     }
 
     public class AllowedNamespacesAndExcludedFilesFinder
