@@ -254,6 +254,7 @@ namespace MigrateToUnityMathematics
             _semanticModel = semanticModel;
         }
 
+        /*
         public override SyntaxNode VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
         {
             var originalSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
@@ -273,7 +274,6 @@ namespace MigrateToUnityMathematics
                 else if (name == "down") replacement = ReplaceStaticProperties(newNode, 0, -1, 0);
                 else if (name == "right") replacement = ReplaceStaticProperties(newNode, 1, 0, 0);
                 else if (name == "left") replacement = ReplaceStaticProperties(newNode, -1, 0, 0);
-                else if (name == "one") replacement = ReplaceStaticProperties(newNode, 1, 1, 1);
                 else if (name == "zero") replacement = ReplaceStaticProperties(newNode, 0, 0, 0);
 
                 if (replacement != null)
@@ -287,6 +287,7 @@ namespace MigrateToUnityMathematics
 
             return newNode;
         }
+        */
 
         public override SyntaxNode VisitInvocationExpression(InvocationExpressionSyntax node)
         {

@@ -90,13 +90,20 @@ namespace MigrateToUnityMathematics
                 config = new AllowedNamespacesAndExcludedFilesFinder(null);
             }
 
-            bool result = await FirstPass(fullPath, config);
+            bool result = await DoPass(fullPath, config, 1);
+            if (result)
+            {
+                Console.WriteLine("========  Starting Second Pass.");
+                result = await DoPass(fullPath, config, 2);
+            }
         }
 
         //===============
-        static async Task<bool> FirstPass(string fullPath, AllowedNamespacesAndExcludedFilesFinder config)
+        static async Task<bool> DoPass(string fullPath, AllowedNamespacesAndExcludedFilesFinder config, int passNum)
         {
             var workspace = MSBuildWorkspace.Create();
+
+            Console.WriteLine("  Doing Pass =========  " + passNum);
 
             // Optional: Handle MSBuild warnings/errors
             workspace.WorkspaceFailed += (sender, e) =>
@@ -162,6 +169,13 @@ namespace MigrateToUnityMathematics
                     Console.WriteLine("Skipping non-C# project.");
                     continue;
                 }
+
+                if (config.AllowedProjects.Count > 0 && !config.AllowedProjects.Contains(project.Name))
+                {
+                    Console.WriteLine($"  Skipping project '{project.Name}' as it's not in the allowed projects list.");
+                    continue;
+                }
+
                 foreach (var document in project.Documents)
                 {
                     if (document.SourceCodeKind != SourceCodeKind.Regular ||
@@ -196,16 +210,36 @@ namespace MigrateToUnityMathematics
                     var originalSyntaxTree = await document.GetSyntaxTreeAsync();
                     var originalSemanticModel = await document.GetSemanticModelAsync();
 
-                    var Vector3ToV3F3UtilsRewriter = new Vector3ToV3F3UtilsTransformer(originalSemanticModel);
-                    var newSyntaxRoot = Vector3ToV3F3UtilsRewriter.Visit(originalSyntaxTree.GetRoot());
-                    if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                    if (passNum == 1)
                     {
-                        totalReplacements += Vector3ToV3F3UtilsRewriter.ReplacementsCount;
+                        Vector3ToV3F3UtilsTransformer Vector3ToV3F3UtilsRewriter = new Vector3ToV3F3UtilsTransformer(originalSemanticModel);
+                        var newSyntaxRoot = Vector3ToV3F3UtilsRewriter.Visit(originalSyntaxTree.GetRoot());
+                        if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                        {
+                            totalReplacements += Vector3ToV3F3UtilsRewriter.ReplacementsCount;
 
-                        newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
+                            newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
 
-                        solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
-                        Console.WriteLine($"    Replaced {Vector3ToV3F3UtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
+                            solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
+                            Console.WriteLine($"    Replaced {Vector3ToV3F3UtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
+                        }
+                    }
+                    else if (passNum == 2)
+                    {
+                        Vector3ToFloat3Transformer Vector3ToV3F3UtilsRewriter = new Vector3ToFloat3Transformer(originalSemanticModel);
+                        var newSyntaxRoot = Vector3ToV3F3UtilsRewriter.Visit(originalSyntaxTree.GetRoot());
+                        if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                        {
+                            totalReplacements += Vector3ToV3F3UtilsRewriter.ReplacementsCount;
+
+                            newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
+
+                            solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
+                            Console.WriteLine($"    Replaced {Vector3ToV3F3UtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
+                        }
+                    } else
+                    {
+                        Console.WriteLine("Unknown pass.");
                     }
                 }
             }
@@ -223,7 +257,6 @@ namespace MigrateToUnityMathematics
                 return false;
             }
         }
- 
 
         private static CompilationUnitSyntax AddRequiredNamespaces(CompilationUnitSyntax root)
         {
@@ -260,6 +293,51 @@ namespace MigrateToUnityMathematics
             return root.AddUsings(newUsings.ToArray());
         }
     }
+
+    class Vector3ToFloat3Transformer : CSharpSyntaxRewriter
+    {
+        private readonly SemanticModel _semanticModel;
+        public int ReplacementsCount { get; private set; } = 0;
+
+        public Vector3ToFloat3Transformer(SemanticModel semanticModel)
+        {
+            _semanticModel = semanticModel;
+        }
+
+        
+         public override SyntaxNode VisitParameter(ParameterSyntax node)
+         {
+            if (node.Type == null)
+                return base.VisitParameter(node);
+
+            var typeInfo = _semanticModel.GetTypeInfo(node.Type).Type;
+
+             if (typeInfo?.ToDisplayString() == "UnityEngine.Vector3")
+             {
+                 ReplacementsCount++;
+                 return node.WithType(SyntaxFactory.ParseTypeName("float3")
+                     .WithTriviaFrom(node.Type));
+             }
+
+             return base.VisitParameter(node);
+         }
+
+         public override SyntaxNode VisitVariableDeclaration(VariableDeclarationSyntax node)
+         {
+             var typeInfo = _semanticModel.GetTypeInfo(node.Type).Type;
+
+             if (typeInfo?.ToDisplayString() == "UnityEngine.Vector3")
+             {
+                 ReplacementsCount++;
+                 return node.WithType(SyntaxFactory.ParseTypeName("float3")
+                     .WithTriviaFrom(node.Type));
+             }
+
+             return base.VisitVariableDeclaration(node);
+         }
+         
+    }
+
 
     /// <summary>
     /// Rewrites Vector3 properties, methods, and operators
@@ -437,8 +515,80 @@ namespace MigrateToUnityMathematics
                 }
             }
 
+            // cast result for Quaternion * Vector3 to a float3
+            if (node.Kind() == SyntaxKind.MultiplyExpression)
+            {
+                var leftType = _semanticModel.GetTypeInfo(node.Left).Type;
+                var rightType = _semanticModel.GetTypeInfo(node.Right).Type;
+
+                if (leftType?.ToDisplayString() == "UnityEngine.Quaternion" &&
+                    (rightType?.ToDisplayString() == "UnityEngine.Vector3" ||
+                     rightType?.ToDisplayString() == "Unity.Mathematics.float3"))
+                {
+                    ReplacementsCount++;
+
+                    // Create "(float3) (myQuaternion * myVector3)"
+                    var newNodee =
+                        SyntaxFactory.CastExpression(
+                            SyntaxFactory.ParseTypeName("float3"),
+                            SyntaxFactory.ParenthesizedExpression(node.WithoutTrivia())
+                        )
+                        .WithTriviaFrom(node);
+
+                    return newNodee;
+                }
+            }
+
             return newNode;
         }
+
+        public override SyntaxNode VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
+        {
+            // First visit children (so arguments get rewritten if needed)
+            var visitedNode = (ObjectCreationExpressionSyntax)base.VisitObjectCreationExpression(node);
+
+            var typeInfo = _semanticModel.GetTypeInfo(node).Type;
+
+            if (typeInfo?.ToDisplayString() == "UnityEngine.Vector3")
+            {
+                ReplacementsCount++;
+
+                // Replace "new Vector3(...)" with "new float3(...)"
+                var newType = SyntaxFactory.ParseTypeName("float3")
+                    .WithTriviaFrom(visitedNode.Type);
+
+                return visitedNode.WithType(newType);
+            }
+
+            return visitedNode;
+        }
+
+        /*
+        public override SyntaxNode VisitIdentifierName(IdentifierNameSyntax node)
+        {
+            // Fully qualify if identifier is "Random" because. Unity.Mathematics has it's own version.
+            if (node.Identifier.Text == "Random")
+            {
+                var symbol = _semanticModel.GetSymbolInfo(node).Symbol;
+
+                // Make sure it's UnityEngine.Random (static class)
+                if (symbol != null &&
+                    symbol.ContainingNamespace?.ToDisplayString() == "UnityEngine" &&
+                    symbol.ContainingType == null)
+                {
+                    ReplacementsCount++;
+
+                    // Replace with fully-qualified name: UnityEngine.Random
+                    var qualified = SyntaxFactory.ParseName("UnityEngine.Random")
+                        .WithTriviaFrom(node);
+
+                    return qualified;
+                }
+            }
+
+            return base.VisitIdentifierName(node);
+        }
+        */
 
         public override SyntaxNode VisitInvocationExpression(InvocationExpressionSyntax node)
         {
@@ -603,42 +753,14 @@ namespace MigrateToUnityMathematics
 
             return base.VisitInvocationExpression(node);
         }
-
-        /*
-        public override SyntaxNode VisitParameter(ParameterSyntax node)
-        {
-            var typeInfo = _semanticModel.GetTypeInfo(node.Type).Type;
-
-            if (typeInfo?.ToDisplayString() == "UnityEngine.Vector3")
-            {
-                ReplacementsCount++;
-                return node.WithType(SyntaxFactory.ParseTypeName("float3")
-                    .WithTriviaFrom(node.Type));
-            }
-
-            return base.VisitParameter(node);
-        }
-
-        public override SyntaxNode VisitVariableDeclaration(VariableDeclarationSyntax node)
-        {
-            var typeInfo = _semanticModel.GetTypeInfo(node.Type).Type;
-
-            if (typeInfo?.ToDisplayString() == "UnityEngine.Vector3")
-            {
-                ReplacementsCount++;
-                return node.WithType(SyntaxFactory.ParseTypeName("float3")
-                    .WithTriviaFrom(node.Type));
-            }
-
-            return base.VisitVariableDeclaration(node);
-        }
-        */
     }
 
     public class AllowedNamespacesAndExcludedFilesFinder
     {
         public HashSet<string> AllowedNamespaces { get; } = new();
         public HashSet<string> ExcludedFileNames { get; } = new();
+
+        public HashSet<string> AllowedProjects { get; } = new();
 
         public AllowedNamespacesAndExcludedFilesFinder(string filePath)
         {
@@ -652,6 +774,7 @@ namespace MigrateToUnityMathematics
 
             bool readingAllowedNamespaces = false;
             bool readingExcludedFileNames = false;
+            bool readingAllowedProjects = false;
 
             foreach (var line in lines)
             {
@@ -659,6 +782,7 @@ namespace MigrateToUnityMathematics
                 {
                     readingAllowedNamespaces = true;
                     readingExcludedFileNames = false;
+                    readingAllowedProjects = false;
                     continue;
                 }
 
@@ -666,6 +790,15 @@ namespace MigrateToUnityMathematics
                 {
                     readingAllowedNamespaces = false;
                     readingExcludedFileNames = true;
+                    readingAllowedProjects = false;
+                    continue;
+                }
+
+                if (line.Equals("ALLOWED_PROJECTS:", StringComparison.OrdinalIgnoreCase))
+                {
+                    readingAllowedNamespaces = false;
+                    readingExcludedFileNames = false;
+                    readingAllowedProjects = true;
                     continue;
                 }
 
@@ -673,11 +806,13 @@ namespace MigrateToUnityMathematics
                     AllowedNamespaces.Add(line);
                 else if (readingExcludedFileNames)
                     ExcludedFileNames.Add(line);
+                else if (readingAllowedProjects)
+                    AllowedProjects.Add(line);
             }
         }
         public bool IsNamespaceAllowed(string ns)
         {
-            return AllowedNamespaces.Count == 0 || AllowedNamespaces.Contains(ns);
+            return AllowedNamespaces.Count == 0 || AllowedNamespaces.Contains(ns) || ns == null || ns == "";
         }
         public bool IsFileExcluded(string fileName)
         {

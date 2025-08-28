@@ -77,6 +77,19 @@ namespace MigrateToUnityMathematics
                 config = new AllowedNamespacesAndExcludedFilesFinder(null);
             }
 
+            bool result = await DoPass(fullPath, config, 1);
+            if (result)
+            {
+                result = await DoPass(fullPath, config, 2);
+            }
+            if (result)
+            {
+                result = await DoPass(fullPath, config, 3);
+            }
+        }
+
+        static async Task<bool> DoPass(string fullPath, AllowedNamespacesAndExcludedFilesFinder config, int passNum)
+        {
             var workspace = MSBuildWorkspace.Create();
 
             // Optional: Handle MSBuild warnings/errors
@@ -116,19 +129,19 @@ namespace MigrateToUnityMathematics
                 else
                 {
                     Console.WriteLine("No .csproj files found in the specified directory. Please provide a solution or project file, or a directory containing .csproj files.");
-                    return;
+                    return false;
                 }
             }
             else
             {
                 Console.WriteLine("Invalid target path. Please provide a path to a .sln, .csproj, or a directory.");
-                return;
+                return false;
             }
 
             if (solution == null)
             {
                 Console.WriteLine("Failed to load solution/project.");
-                return;
+                return false;
             }
 
             Console.WriteLine($"Solution loaded. Contains {solution.Projects.Count()} project(s).");
@@ -177,17 +190,52 @@ namespace MigrateToUnityMathematics
                     var originalSyntaxTree = await document.GetSyntaxTreeAsync();
                     var originalSemanticModel = await document.GetSemanticModelAsync();
 
-                    var QuaternionToQMUtilsRewriter = new QuaternionToQMUtilsTransformer(originalSemanticModel);
-                    var newSyntaxRoot = QuaternionToQMUtilsRewriter.Visit(originalSyntaxTree.GetRoot());
-
-                    if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                    if (passNum == 1)
                     {
-                        totalReplacements += QuaternionToQMUtilsRewriter.ReplacementsCount;
+                        var QuaternionToQMUtilsRewriter = new QuaternionToQMUtilsTransformer(originalSemanticModel);
+                        var newSyntaxRoot = QuaternionToQMUtilsRewriter.Visit(originalSyntaxTree.GetRoot());
 
-                        newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
+                        if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                        {
+                            totalReplacements += QuaternionToQMUtilsRewriter.ReplacementsCount;
 
-                        solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
-                        Console.WriteLine($"    Replaced {QuaternionToQMUtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
+                            newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
+
+                            solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
+                            Console.WriteLine($"    Replaced {QuaternionToQMUtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
+                        }
+                    }
+                    else if (passNum == 2)
+                    {
+                        QuaternionToMathDotQuaternionTransformer Vector3ToV3F3UtilsRewriter = new QuaternionToMathDotQuaternionTransformer(originalSemanticModel);
+                        var newSyntaxRoot = Vector3ToV3F3UtilsRewriter.Visit(originalSyntaxTree.GetRoot());
+                        if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                        {
+                            totalReplacements += Vector3ToV3F3UtilsRewriter.ReplacementsCount;
+
+                            newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
+
+                            solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
+                            Console.WriteLine($"    Replaced {Vector3ToV3F3UtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
+                        }
+                    }
+                    else if (passNum == 3)
+                    {
+                        QuaternionFieldFixerTransformer Vector3ToV3F3UtilsRewriter = new QuaternionFieldFixerTransformer(originalSemanticModel);
+                        var newSyntaxRoot = Vector3ToV3F3UtilsRewriter.Visit(originalSyntaxTree.GetRoot());
+                        if (newSyntaxRoot != originalSyntaxTree.GetRoot())
+                        {
+                            totalReplacements += Vector3ToV3F3UtilsRewriter.ReplacementsCount;
+
+                            newSyntaxRoot = AddRequiredNamespaces((CompilationUnitSyntax)newSyntaxRoot);
+
+                            solution = solution.WithDocumentSyntaxRoot(document.Id, newSyntaxRoot);
+                            Console.WriteLine($"    Replaced {Vector3ToV3F3UtilsRewriter.ReplacementsCount} instances in {Path.GetFileName(document.FilePath)}");
+                        }
+                    }
+                    else 
+                    {
+                        Console.WriteLine("Unknown pass.");
                     }
                 }
             }
@@ -197,10 +245,12 @@ namespace MigrateToUnityMathematics
             {
                 Console.WriteLine($"Successfully applied all changes. Total replacements: {totalReplacements}");
                 Console.WriteLine("Remember to add the QuaternionToMathematicsUtils.cs file to your Unity project if you haven't already.");
+                return true;
             }
             else
             {
                 Console.WriteLine("Failed to apply changes to disk.");
+                return false;
             }
         }
 
@@ -258,7 +308,7 @@ namespace MigrateToUnityMathematics
 
             var newNode = (BinaryExpressionSyntax)base.VisitBinaryExpression(node);
 
-            if (originalKind == SyntaxKind.EqualsExpression || originalKind == SyntaxKind.MultiplyExpression)
+            if (originalKind == SyntaxKind.EqualsExpression || originalKind == SyntaxKind.NotEqualsExpression || originalKind == SyntaxKind.MultiplyExpression)
             {
                 if (originalLeftType?.ToDisplayString() == "UnityEngine.Quaternion" &&
                     originalRightType?.ToDisplayString() == "UnityEngine.Quaternion")
@@ -269,6 +319,10 @@ namespace MigrateToUnityMathematics
                     if (originalKind == SyntaxKind.EqualsExpression)
                     {
                         newNodeName = "Equals";
+                    }
+                    else if (originalKind == SyntaxKind.NotEqualsExpression)
+                    {
+                        newNodeName = "NotEquals";
                     }
                     else
                     {
@@ -297,6 +351,33 @@ namespace MigrateToUnityMathematics
                     return invocationExpression
                         .WithLeadingTrivia(newNode.GetLeadingTrivia())
                         .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                }
+
+                if (originalLeftType?.ToDisplayString() == "UnityEngine.Quaternion" &&
+                    (originalRightType?.ToDisplayString() == "UnityEngine.Vector3" || originalRightType?.ToDisplayString() == "Unity.Mathematics.float3"))
+                {
+                    if (node.Kind() == SyntaxKind.MultiplyExpression)
+                    {
+                        ReplacementsCount++;
+
+                        var leftText = node.Left.WithoutTrivia();
+                        var rightText = node.Right.WithoutTrivia();
+
+                        var mulCall = SyntaxFactory.InvocationExpression(
+                            SyntaxFactory.MemberAccessExpression(
+                                SyntaxKind.SimpleMemberAccessExpression,
+                                SyntaxFactory.IdentifierName("math"),
+                                SyntaxFactory.IdentifierName("mul")))
+                            .WithArgumentList(
+                                SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(new[]
+                                {
+                                    SyntaxFactory.Argument(leftText),
+                                    SyntaxFactory.Argument(rightText)
+                                })));
+
+                        return mulCall.WithTriviaFrom(node);
+
+                    }
                 }
             }
 
@@ -361,7 +442,7 @@ namespace MigrateToUnityMathematics
                         .WithTrailingTrivia(newNode.GetTrailingTrivia());
                 }
             }
-            /*
+            
             else if (originalSymbol is IFieldSymbol fieldSymbol &&
                      fieldSymbol.ContainingType?.ToDisplayString() == "UnityEngine.Quaternion")
             {
@@ -369,29 +450,25 @@ namespace MigrateToUnityMathematics
                 {
                     ReplacementsCount++;
 
-                    var expression = newNode.Expression;
-
-                    var argumentList = SyntaxFactory.ArgumentList(
-                        SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.Argument(expression.WithoutTrivia())
-                        )
-                    );
-
-                    var memberAccess = SyntaxFactory.MemberAccessExpression(
+                    newNode = SyntaxFactory.MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
-                        SyntaxFactory.IdentifierName("QuaternionToMathematicsUtils"),
+                        SyntaxFactory.MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            node.Expression, // "q"
+                            SyntaxFactory.IdentifierName("value")
+                        ),
                         SyntaxFactory.IdentifierName(memberName)
-                    );
+                    ).WithTriviaFrom(node);
 
-                    return SyntaxFactory.InvocationExpression(memberAccess, argumentList)
-                        .WithLeadingTrivia(newNode.GetLeadingTrivia())
-                        .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                    ReplacementsCount++;
+                    return newNode;
                 }
             }
-            */
+            
             return newNode;
         }
 
+        /*
         public override SyntaxNode VisitAssignmentExpression(AssignmentExpressionSyntax node)
         {
             var newNode = (AssignmentExpressionSyntax)base.VisitAssignmentExpression(node);
@@ -432,7 +509,9 @@ namespace MigrateToUnityMathematics
 
             return newNode;
         }
+        */
 
+        /*
         public override SyntaxNode VisitElementAccessExpression(ElementAccessExpressionSyntax node)
         {
             var targetType = _semanticModel.GetTypeInfo(node.Expression).Type;
@@ -470,6 +549,7 @@ namespace MigrateToUnityMathematics
 
             return newNode;
         }
+        */
 
         public override SyntaxNode VisitInvocationExpression(InvocationExpressionSyntax node)
         {
@@ -502,7 +582,7 @@ namespace MigrateToUnityMathematics
 
                         if (methodSymbol.Parameters.Length == 2 &&
                             methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_Single &&
-                            methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            (methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" || methodSymbol.Parameters[1].Type.ToDisplayString() == "Unity.Mathematics.float3") &&
                             (memberAccessName == "AngleAxis"))
                         {
                             if (newName == "AngleAxis") newName = "AngleAxis_deg";
@@ -511,7 +591,7 @@ namespace MigrateToUnityMathematics
                         }
 
                         if (methodSymbol.Parameters.Length == 1 &&
-                            methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            (methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" || methodSymbol.Parameters[0].Type.ToDisplayString() == "Unity.Mathematics.float3") &&
                             (memberAccessName == "Euler" || memberAccessName == "LookRotation"))
                         {
                             if (newName == "Euler") newName = "Euler_deg";
@@ -520,8 +600,8 @@ namespace MigrateToUnityMathematics
                         }
 
                         if (methodSymbol.Parameters.Length == 2 &&
-                            methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
-                            methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            (methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" || methodSymbol.Parameters[0].Type.ToDisplayString() == "Unity.Mathematics.float3") &&
+                            (methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" || methodSymbol.Parameters[1].Type.ToDisplayString() == "Unity.Mathematics.float3") &&
                             (memberAccessName == "FromToRotation" || memberAccessName == "LookRotation"))
                         {
                             return CreateReplacementInvocation(newName, newNode.ArgumentList, newNode);
@@ -589,8 +669,8 @@ namespace MigrateToUnityMathematics
                         }
 
                         if (methodSymbol.Parameters.Length == 2 &&
-                            methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
-                            methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            (methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" || methodSymbol.Parameters[0].Type.ToDisplayString() == "Unity.Mathematics.float3") &&
+                            (methodSymbol.Parameters[1].Type.ToDisplayString() == "UnityEngine.Vector3" || methodSymbol.Parameters[1].Type.ToDisplayString() == "Unity.Mathematics.float3") &&
                             (memberAccessName == "SetFromToRotation" || memberAccessName == "SetLookRotation"))
                         {
                             var instanceExpr = memberAccess.Expression;
@@ -604,7 +684,7 @@ namespace MigrateToUnityMathematics
                         }
 
                         if (methodSymbol.Parameters.Length == 1 &&
-                            methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" &&
+                            (methodSymbol.Parameters[0].Type.ToDisplayString() == "UnityEngine.Vector3" || methodSymbol.Parameters[0].Type.ToDisplayString() == "Unity.Mathematics.float3") &&
                             memberAccessName == "SetLookRotation")
                         {
                             var instanceExpr = memberAccess.Expression;
@@ -653,7 +733,39 @@ namespace MigrateToUnityMathematics
 
                     return newNode;
                 }
+
+
+                //========
+                originalSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
+
+                // var newNode = (InvocationExpressionSyntax)base.VisitInvocationExpression(node);
+
+                if (originalSymbol is IMethodSymbol methodSymboll &&
+                    methodSymboll.ContainingType != null &&
+                    methodSymboll.ContainingType.ToDisplayString() == "UnityEngine.Quaternion" &&
+                    methodSymboll.Name == "ToString")
+                {
+                    if (methodSymboll.Parameters.Length == 1 &&
+                            methodSymboll.Parameters[0].Type.SpecialType == SpecialType.System_String)
+                    {
+                        ReplacementsCount++;
+
+                        // The .Expression part is `myVec.ToString`
+                        var noArgInvocation = SyntaxFactory.InvocationExpression(
+                            newNode.Expression,
+                            SyntaxFactory.ArgumentList() // empty arg list
+                        );
+
+                        return noArgInvocation
+                            .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                            .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                    }
+
+                }
+                //========
             }
+
+
 
             return base.VisitInvocationExpression(node);
         }
@@ -695,6 +807,137 @@ namespace MigrateToUnityMathematics
             return invocationExpression
                 .WithLeadingTrivia(originalNode.GetLeadingTrivia())
                 .WithTrailingTrivia(originalNode.GetTrailingTrivia()); ;
+        }
+    }
+
+    class QuaternionToMathDotQuaternionTransformer : CSharpSyntaxRewriter
+    {
+        private readonly SemanticModel _semanticModel;
+        public int ReplacementsCount { get; private set; } = 0;
+
+        public QuaternionToMathDotQuaternionTransformer(SemanticModel semanticModel)
+        {
+            _semanticModel = semanticModel;
+        }
+
+
+        public override SyntaxNode VisitParameter(ParameterSyntax node)
+        {
+            if (node.Type == null)
+                return base.VisitParameter(node);
+
+            var typeInfo = _semanticModel.GetTypeInfo(node.Type).Type;
+
+            if (typeInfo?.ToDisplayString() == "UnityEngine.Quaternion")
+            {
+                ReplacementsCount++;
+                return node.WithType(SyntaxFactory.ParseTypeName("quaternion")
+                    .WithTriviaFrom(node.Type));
+            }
+
+            return base.VisitParameter(node);
+        }
+
+        public override SyntaxNode VisitVariableDeclaration(VariableDeclarationSyntax node)
+        {
+            var typeInfo = _semanticModel.GetTypeInfo(node.Type).Type;
+
+            if (typeInfo?.ToDisplayString() == "UnityEngine.Quaternion")
+            {
+                ReplacementsCount++;
+                return node.WithType(SyntaxFactory.ParseTypeName("quaternion")
+                    .WithTriviaFrom(node.Type));
+            }
+
+            return base.VisitVariableDeclaration(node);
+        }
+
+        public override SyntaxNode VisitMethodDeclaration(MethodDeclarationSyntax node)
+        {
+            if (node.ReturnType != null)
+            {
+                var typeInfo = _semanticModel.GetTypeInfo(node.ReturnType).Type;
+
+                if (typeInfo?.ToDisplayString() == "UnityEngine.Quaternion")
+                {
+                    ReplacementsCount++;
+                    return node.WithReturnType(
+                        SyntaxFactory.ParseTypeName("quaternion")
+                            .WithTriviaFrom(node.ReturnType));
+                }
+            }
+
+            return base.VisitMethodDeclaration(node);
+        }
+
+        public override SyntaxNode VisitFieldDeclaration(FieldDeclarationSyntax node)
+        {
+            var typeInfo = _semanticModel.GetTypeInfo(node.Declaration.Type).Type;
+
+            // Check if it's a UnityEngine.Quaternion
+            if (typeInfo?.ToDisplayString() == "UnityEngine.Quaternion")
+            {
+                // If the containing class is a MonoBehaviour or ScriptableObject, skip. Serialization doesn't survive conversion.
+                var containingClass = node.Parent as ClassDeclarationSyntax;
+                if (containingClass != null)
+                {
+                    var classSymbol = _semanticModel.GetDeclaredSymbol(containingClass);
+                    var baseType = classSymbol?.BaseType?.ToDisplayString();
+
+                    if (baseType == "UnityEngine.MonoBehaviour" || baseType == "UnityEngine.ScriptableObject")
+                        return base.VisitFieldDeclaration(node); // don’t convert
+                }
+
+                // Otherwise convert to quaternion
+                ReplacementsCount++;
+                return node.WithDeclaration(node.Declaration.WithType(
+                    SyntaxFactory.ParseTypeName("quaternion")
+                        .WithTriviaFrom(node.Declaration.Type)));
+            }
+
+            return base.VisitFieldDeclaration(node);
+        }
+    }
+
+    class QuaternionFieldFixerTransformer : CSharpSyntaxRewriter
+    {
+        private readonly SemanticModel _semanticModel;
+        public int ReplacementsCount { get; private set; } = 0;
+
+        public QuaternionFieldFixerTransformer(SemanticModel semanticModel)
+        {
+            _semanticModel = semanticModel;
+        }
+
+        public override SyntaxNode VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
+        {
+            // Get symbol info for the member being accessed
+            var symbol = _semanticModel.GetSymbolInfo(node).Symbol;
+
+            if (symbol is IFieldSymbol fieldSymbol &&
+                fieldSymbol.ContainingType.ToDisplayString() == "Unity.Mathematics.quaternion")
+            {
+                var fieldName = fieldSymbol.Name; // "x", "y", "z", or "w"
+
+                if (fieldName == "x" || fieldName == "y" || fieldName == "z" || fieldName == "w")
+                {
+                    // Rebuild as: q.value.{fieldName}
+                    var newNode = SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            node.Expression, // "q"
+                            SyntaxFactory.IdentifierName("value")
+                        ),
+                        SyntaxFactory.IdentifierName(fieldName)
+                    ).WithTriviaFrom(node);
+
+                    ReplacementsCount++;
+                    return newNode;
+                }
+            }
+
+            return base.VisitMemberAccessExpression(node);
         }
     }
 
