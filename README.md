@@ -1,3 +1,5 @@
+This project is pretty rough, but did save days of mind-numbing, error-prone, tedious find/replace. There was still some find/replace but it was reduced to a few hundred rather than thousands.
+
 This is a C# console application that will help migrate:
     - UnityEngine.Vector3  to  Unity.Mathematics.float3
     - UnityEngine.Quaternion  to  Unity.Mathematics.quaternion
@@ -8,6 +10,8 @@ It uses Roslyn to crawl the code looking for instance methods like:
     - myVector3.normalized
     - myVector3.Normalize()
     - == 
+    - myQuat * myQuat
+    - myQuat * myVector3
     
 STEP 1  
 
@@ -17,19 +21,11 @@ These are replaced with inline static wrapper methods:
         - Vector3ToFloat3Utils.normalized( myVector3 )
         - Vector3ToFloat3Utils.Normalize( ref myVector3 )
 
-After these changes the project should still run perfectly using Vector3. 
-    
+After these changes there will be some errors usually for edge cases where there are mixed arguments float3, Vector3. Fix these manually. 
+
 STEP 2
 
-Replace Vector3 with float3. Since "Vector3ToFloat3Utils contains overloaded methods:
-       - public static float Vector3ToFloat3Utils.magnitude( Vector3 myVector3 )
-       - public static float Vector3ToFloat3Utils.magnitude( float3 myVector3 )
-
-The project should still fun with very few errors.
-
-STEP 3
-
-Eliminate the static wrapper functions: 
+Eliminate the static wrapper functions using manual find/replace: 
        - Vector3ToFloat3Utils.length -> Unity.Mathematics.length()
        - etc...
 

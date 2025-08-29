@@ -78,19 +78,24 @@ namespace MigrateToUnityMathematics
             }
 
             bool result = await DoPass(fullPath, config, 1);
+            
             if (result)
             {
                 result = await DoPass(fullPath, config, 2);
             }
+            
             if (result)
             {
                 result = await DoPass(fullPath, config, 3);
             }
+            
         }
 
         static async Task<bool> DoPass(string fullPath, AllowedNamespacesAndExcludedFilesFinder config, int passNum)
         {
             var workspace = MSBuildWorkspace.Create();
+
+            Console.WriteLine("============== doing pass: " + passNum);
 
             // Optional: Handle MSBuild warnings/errors
             workspace.WorkspaceFailed += (sender, e) =>
@@ -443,6 +448,7 @@ namespace MigrateToUnityMathematics
                 }
             }
             
+            /*
             else if (originalSymbol is IFieldSymbol fieldSymbol &&
                      fieldSymbol.ContainingType?.ToDisplayString() == "UnityEngine.Quaternion")
             {
@@ -464,6 +470,7 @@ namespace MigrateToUnityMathematics
                     return newNode;
                 }
             }
+            */
             
             return newNode;
         }
@@ -714,55 +721,45 @@ namespace MigrateToUnityMathematics
                             return CreateReplacementInvocation(newName,
                                 SyntaxFactory.ArgumentList(args), newNode);
                         }
-                        if (memberAccessName == "ToString" &&
-                            methodSymbol.Parameters.Length == 0 &&
-                            methodSymbol.ContainingType.ToString() == "UnityEngine.Quaternion" &&
-                            !methodSymbol.IsStatic)
+
+
+                        //========
+                        originalSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
+
+                        // var newNode = (InvocationExpressionSyntax)base.VisitInvocationExpression(node);
+
+                        if (originalSymbol is IMethodSymbol methodSymboll &&
+                            methodSymboll.ContainingType != null &&
+                            methodSymboll.ContainingType.ToDisplayString() == "UnityEngine.Quaternion" &&
+                            methodSymboll.Name == "ToString")
                         {
-                            var instanceExpr = memberAccess.Expression;
-
-                            var args = SyntaxFactory.SeparatedList(new[]
+                            if (methodSymboll.Parameters.Length == 1 &&
+                                    methodSymboll.Parameters[0].Type.SpecialType == SpecialType.System_String)
                             {
-                                SyntaxFactory.Argument(instanceExpr)
-                            });
+                                ReplacementsCount++;
 
-                            return CreateReplacementInvocation("ToString",
-                                SyntaxFactory.ArgumentList(args), newNode);
+                                // The .Expression part is `myVec.ToString`
+                                var noArgInvocation = SyntaxFactory.InvocationExpression(
+                                    newNode.Expression,
+                                    SyntaxFactory.ArgumentList() // empty arg list
+                                );
+
+                                return noArgInvocation
+                                    .WithLeadingTrivia(newNode.GetLeadingTrivia())
+                                    .WithTrailingTrivia(newNode.GetTrailingTrivia());
+                            }
+
                         }
+                        //========
+
+
                     }
 
                     return newNode;
                 }
 
 
-                //========
-                originalSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
 
-                // var newNode = (InvocationExpressionSyntax)base.VisitInvocationExpression(node);
-
-                if (originalSymbol is IMethodSymbol methodSymboll &&
-                    methodSymboll.ContainingType != null &&
-                    methodSymboll.ContainingType.ToDisplayString() == "UnityEngine.Quaternion" &&
-                    methodSymboll.Name == "ToString")
-                {
-                    if (methodSymboll.Parameters.Length == 1 &&
-                            methodSymboll.Parameters[0].Type.SpecialType == SpecialType.System_String)
-                    {
-                        ReplacementsCount++;
-
-                        // The .Expression part is `myVec.ToString`
-                        var noArgInvocation = SyntaxFactory.InvocationExpression(
-                            newNode.Expression,
-                            SyntaxFactory.ArgumentList() // empty arg list
-                        );
-
-                        return noArgInvocation
-                            .WithLeadingTrivia(newNode.GetLeadingTrivia())
-                            .WithTrailingTrivia(newNode.GetTrailingTrivia());
-                    }
-
-                }
-                //========
             }
 
 
@@ -831,6 +828,7 @@ namespace MigrateToUnityMathematics
             if (typeInfo?.ToDisplayString() == "UnityEngine.Quaternion")
             {
                 ReplacementsCount++;
+                // Console.WriteLine("   Replacing param: " + node.GetText());
                 return node.WithType(SyntaxFactory.ParseTypeName("quaternion")
                     .WithTriviaFrom(node.Type));
             }
@@ -844,7 +842,24 @@ namespace MigrateToUnityMathematics
 
             if (typeInfo?.ToDisplayString() == "UnityEngine.Quaternion")
             {
+                // If the containing class is a MonoBehaviour or ScriptableObject, skip. Serialization doesn't survive conversion.
+                var containingClass = node.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+                if (containingClass != null)
+                {
+                    var classSymbol = _semanticModel.GetDeclaredSymbol(containingClass);
+                    if (InheritsFrom(classSymbol, "UnityEngine.MonoBehaviour") ||
+                        InheritsFrom(classSymbol, "UnityEngine.ScriptableObject"))
+                    {
+                        // Console.WriteLine($"   Skipping {node.GetText()} because it's a MonoBehaviour/ScriptableObject field");
+                        return base.VisitVariableDeclaration(node);
+                    }
+                }
+
+
                 ReplacementsCount++;
+
+                // Console.WriteLine("   Found local var of type Quaternion: " + node.GetText());
+
                 return node.WithType(SyntaxFactory.ParseTypeName("quaternion")
                     .WithTriviaFrom(node.Type));
             }
@@ -861,6 +876,7 @@ namespace MigrateToUnityMathematics
                 if (typeInfo?.ToDisplayString() == "UnityEngine.Quaternion")
                 {
                     ReplacementsCount++;
+                    // Console.WriteLine("   Method return of type Quaternion: " + node.GetText());
                     return node.WithReturnType(
                         SyntaxFactory.ParseTypeName("quaternion")
                             .WithTriviaFrom(node.ReturnType));
@@ -874,28 +890,39 @@ namespace MigrateToUnityMathematics
         {
             var typeInfo = _semanticModel.GetTypeInfo(node.Declaration.Type).Type;
 
-            // Check if it's a UnityEngine.Quaternion
             if (typeInfo?.ToDisplayString() == "UnityEngine.Quaternion")
             {
-                // If the containing class is a MonoBehaviour or ScriptableObject, skip. Serialization doesn't survive conversion.
-                var containingClass = node.Parent as ClassDeclarationSyntax;
+                var containingClass = node.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
                 if (containingClass != null)
                 {
                     var classSymbol = _semanticModel.GetDeclaredSymbol(containingClass);
-                    var baseType = classSymbol?.BaseType?.ToDisplayString();
-
-                    if (baseType == "UnityEngine.MonoBehaviour" || baseType == "UnityEngine.ScriptableObject")
-                        return base.VisitFieldDeclaration(node); // don’t convert
+                    if (InheritsFrom(classSymbol, "UnityEngine.MonoBehaviour") ||
+                        InheritsFrom(classSymbol, "UnityEngine.ScriptableObject"))
+                    {
+                        // Console.WriteLine($"   Skipping {node.GetText()} because it's a MonoBehaviour/ScriptableObject field");
+                        return base.VisitFieldDeclaration(node);
+                    }
                 }
 
-                // Otherwise convert to quaternion
                 ReplacementsCount++;
+                // Console.WriteLine($"   Converting field of type Quaternion: {node.GetText()}");
                 return node.WithDeclaration(node.Declaration.WithType(
                     SyntaxFactory.ParseTypeName("quaternion")
                         .WithTriviaFrom(node.Declaration.Type)));
             }
 
             return base.VisitFieldDeclaration(node);
+        }
+
+        private static bool InheritsFrom(INamedTypeSymbol? type, string baseTypeName)
+        {
+            while (type != null)
+            {
+                if (type.ToDisplayString() == baseTypeName)
+                    return true;
+                type = type.BaseType;
+            }
+            return false;
         }
     }
 
@@ -912,27 +939,25 @@ namespace MigrateToUnityMathematics
         public override SyntaxNode VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
         {
             // Get symbol info for the member being accessed
-            var symbol = _semanticModel.GetSymbolInfo(node).Symbol;
-
-            if (symbol is IFieldSymbol fieldSymbol &&
-                fieldSymbol.ContainingType.ToDisplayString() == "Unity.Mathematics.quaternion")
+            var typeInfo = _semanticModel.GetTypeInfo(node.Expression).Type;
+            if (typeInfo?.ToDisplayString() == "Unity.Mathematics.quaternion")
             {
-                var fieldName = fieldSymbol.Name; // "x", "y", "z", or "w"
+                // ===================
+                var fieldName = node.Name.Identifier.Text;
 
-                if (fieldName == "x" || fieldName == "y" || fieldName == "z" || fieldName == "w")
+                if (fieldName is "x" or "y" or "z" or "w")
                 {
-                    // Rebuild as: q.value.{fieldName}
+                    // Rewrite "myQuat.x" -> "myQuat.value.x"
                     var newNode = SyntaxFactory.MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
                         SyntaxFactory.MemberAccessExpression(
                             SyntaxKind.SimpleMemberAccessExpression,
-                            node.Expression, // "q"
-                            SyntaxFactory.IdentifierName("value")
+                            node.Expression,                // "myQuat"
+                            SyntaxFactory.IdentifierName("value") // "myQuat.value"
                         ),
-                        SyntaxFactory.IdentifierName(fieldName)
+                        SyntaxFactory.IdentifierName(fieldName)   // "x"
                     ).WithTriviaFrom(node);
 
-                    ReplacementsCount++;
                     return newNode;
                 }
             }
